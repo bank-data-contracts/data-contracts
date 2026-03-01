@@ -1,7 +1,8 @@
-/tým 6 - strategie/          @bank-data-contracts/tým-strategie
-/DataGov/                    @bank-data-contracts/tým-DataGov
-/tým 3 - obsluha klienta/    @bank-data-contracts/tým-obsluha-klienta
-/tým 4 - steering data/      @bank-data-contracts/tým-DataGov
-/tým 7 - ICM Gen AI Data UC/ @bank-data-contracts/tým-icm-genai
-/tým 8 - Investment banking/ @bank-data-contracts/tým-investment-banking
-/tým esg-risk/               @bank-data-contracts/tým-esg-risk
+"tým 6 - strategie/"          @bank-data-contracts/tým-strategie
+"DataGov/"                    @bank-data-contracts/tým-DataGov
+"tým 3 - obsluha klienta/"    @bank-data-contracts/tým-obsluha-klienta
+"tým 4 - steering data/"      @bank-data-contracts/tým-DataGov
+"tým 7 - ICM Gen AI Data UC/" @bank-data-contracts/tým-icm-genai
+"tým 8 - Investment banking/" @bank-data-contracts/tým-investment-banking
+"tým 1- digi/"                @bank-data-contracts/tým-digi
+"tým esg-risk/"               @bank-data-contracts/tým-esg-risk
