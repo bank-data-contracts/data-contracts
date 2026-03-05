@@ -1,0 +1,85 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: esg-risk-score-profile
+name: ESG Risk Score Profile
+version: 1.0.0
+status: proposed
+description:
+  purpose: "Zpřesnění valuace nemovitostí a zrychlení úvěrového procesu."
+  usage: "Výpočet ESG skóre pro schvalování úvěrů a ocenění zajištění. Regulatory compliance (ČNB, EU), efektivnější řízení rizik."
+  limitations: "Výpočet závisí na dostupnosti externích registrů. Podkladová data jsou aktualizována v ročních cyklech."
+  customProperties:
+    - property: "sensitivity"
+      value: "internal"
+      description: "Obsahuje interní skóringové modely a geolokační data."
+    - property: "capability"
+      value: "Data Ingestion & Integration, Analytical & Scoring Engines"
+
+schema:
+  - name: esg_scores
+    physicalType: TABLE
+    description: "Aktuální ESG skóre a rizikové třídy vypočtené na úrovni budovy (GPS)."
+    properties:
+      - name: building_id
+        logicalType: string
+        businessName: Building Identifier
+        description: "Unikátní identifikátor budovy z Katastru nemovitostí."
+        physicalType: VARCHAR
+        examples:
+          - "LV-12345-PRG"
+        primaryKey: true
+        required: true
+        unique: true
+      - name: gps_latitude
+        logicalType: number
+        businessName: GPS Latitude
+        description: "Zeměpisná šířka budovy."
+        physicalType: DOUBLE
+        examples:
+          - 50.0755
+        required: true
+      - name: gps_longitude
+        logicalType: number
+        businessName: GPS Longitude
+        description: "Zeměpisná délka budovy."
+        physicalType: DOUBLE
+        examples:
+          - 14.4378
+        required: true
+      - name: esg_overall_score
+        logicalType: number
+        businessName: ESG Overall Score
+        description: "Výsledné vypočtené ESG skóre (0-100)."
+        physicalType: DECIMAL
+        examples:
+          - 78.5
+        quality:
+          - type: text
+            description: "Skóre musí být v intervalu 0 až 100."
+
+team:
+  name: "Risk (ESG) tým"
+  description: "Tým zodpovědný za ESG risk management a scoringové modely."
+  members:
+    - username: martin.hanus@bank.cz
+      name: ESG Owner
+      role: Owner
+    - username: anna.spilkova@bank.cz
+      name: Head of ESG Risk
+      role: Owner
+    - username: marketa.honcikova@bank.cz
+      name: Data Scientist
+      role: Owner
+    - username: matej.koys@bank.cz
+      name: Data Engineer
+      role: Owner
+    - username: erik.seidl@bank.cz
+      name: Risk Quant Analytik
+      role: Owner
+
+tags:
+  - risk
+  - esg
+  - scoring
+
+contractCreatedTs: "2026-03-05T10:00:00Z"
