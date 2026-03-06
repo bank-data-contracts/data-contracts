@@ -1,0 +1,171 @@
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:customer-service:interaction-performance
+
+info:
+  title: DP_CUSTOMER_SERVICE_INTERACTION_PERFORMANCE
+  name: Interaction Performance KPIs (NPS, FCR, SLA, AHT, Escalations)
+  maturity_score: 55%
+  version: 1.0.0
+  status: in development
+  description: |
+    Standardizovaně měřit a řídit kvalitu obsluhy a klientskou zkušenost
+
+    Value:
+    Transparentní řízení výkonnosti obsluhy, identifikace slabých míst a systematické zvyšování NPS.
+
+    Use Case:
+    Centralizované reportingové výstupy a dashboardy (NPS, FCR, SLA, AHT, eskalace) s možností drill-down dle pobočky, týmu, kanálu a typu požadavku.
+
+    Consumer:
+    Management obsluhy, team leadeři, kvalita/operations
+
+    Granularity:
+    Agregace po dni/týdnu; drill‑down na pobočku/tým/kanál/typ požadavku
+
+    Time aggregation:
+    Denní EOD + týdenní/měsíční agregace
+
+    Freshness:
+    Denní (T+1)
+
+    Data sources:
+    - Ticketing/Case management
+    - Telephony/Contact center systém
+    - CRM
+    - NPS/Feedback nástroj
+    - HR/Agent master data
+
+  owner: Nova Banka \ Team3 \ Obsluha klienta
+  contact:
+    name: Artur Zakharov
+    email: zaka09@vse.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: datamesh-nova-banka-prod
+    schema: customer_service_prod
+    table: dp_customer_service_interaction_performance_daily
+
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: datamesh-nova-banka-dev
+    schema: customer_service_dev
+    table: dp_customer_service_interaction_performance_daily
+
+schema:
+  - name: dp_customer_service_interaction_performance_daily
+    description: Denní agregace KPI obsluhy s možností drill-down dle pobočky/týmu/kanálu/typu požadavku.
+    fields:
+      - name: business_date
+        type: date
+        description: KPI date (daily aggregation).
+        required: true
+        example: "2026-03-04"
+
+      - name: channel
+        type: string
+        description: Service channel.
+        required: true
+        enum: [branch, call_center, chat, ib, mb]
+        example: "call_center"
+
+      - name: branch_id
+        type: string
+        description: Branch identifier (if applicable).
+        required: false
+        example: "BR-0123"
+
+      - name: team_id
+        type: string
+        description: Team/queue identifier (call center / operations).
+        required: false
+        example: "CC-RET-01"
+
+      - name: request_type
+        type: string
+        description: Type/category of request/case.
+        required: true
+        example: "card_block"
+
+      - name: interactions_count
+        type: integer
+        description: Number of interactions/cases in the aggregation bucket.
+        required: true
+        example: 245
+
+      - name: fcr_rate
+        type: double
+        description: First Contact Resolution rate (0..1).
+        required: false
+        example: 0.71
+
+      - name: sla_compliance_rate
+        type: double
+        description: Share of cases handled within SLA (0..1).
+        required: false
+        example: 0.88
+
+      - name: aht_seconds
+        type: integer
+        description: Average handle time in seconds.
+        required: false
+        example: 420
+
+      - name: escalations_count
+        type: integer
+        description: Count of escalations in the bucket.
+        required: false
+        example: 6
+
+      - name: nps_avg
+        type: double
+        description: Average NPS score (0..10).
+        required: false
+        example: 8.4
+
+quality:
+  - rule: not_null
+    field: business_date
+    description: business_date nesmí být prázdné
+
+  - rule: not_null
+    field: channel
+    description: channel nesmí být prázdné
+
+  - rule: accepted_values
+    field: channel
+    values: [branch, call_center, chat, ib, mb]
+    description: channel musí být z definované množiny
+
+  - rule: not_null
+    field: request_type
+    description: request_type nesmí být prázdné
+
+  - rule: range
+    field: fcr_rate
+    min: 0.0
+    max: 1.0
+    description: fcr_rate musí být v rozsahu 0..1 (pokud vyplněno)
+
+  - rule: range
+    field: sla_compliance_rate
+    min: 0.0
+    max: 1.0
+    description: sla_compliance_rate musí být v rozsahu 0..1 (pokud vyplněno)
+
+  - rule: range
+    field: nps_avg
+    min: 0.0
+    max: 10.0
+    description: nps_avg musí být v rozsahu 0..10 (pokud vyplněno)
+
+sla:
+  availability: 99.5%
+  data_latency: "Denní (T+1)"
+  retention_period: 36 months
+  support_contact: zaka09@vse.cz

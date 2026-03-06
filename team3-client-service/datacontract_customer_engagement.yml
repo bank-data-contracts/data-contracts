@@ -1,0 +1,160 @@
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:customer-service:customer-engagement
+
+info:
+  title: DP_CUSTOMER_SERVICE_CUSTOMER_ENGAGEMENT
+  name: Customer Engagement (NBA + Churn Risk)
+  maturity_score: 45%
+  version: 1.0.0
+  status: in development
+  description: |
+    Personalizovat komunikaci s klientem a zároveň včas identifikovat riziko odchodu
+
+    Value:
+    Vyšší konverze nabídek, efektivnější cross‑sell/upsell a snížení churn rate díky cíleným retenčním aktivitám.
+
+    Use Case:
+    Datový produkt kombinuje doporučení Next Best Action s identifikací churn rizika. Na základě transakcí, interakcí a chování klienta systém doporučuje vhodnou nabídku nebo retenční krok při kontaktu s klientem.
+
+    Consumer:
+    Call centrum, pobočky, CRM, retenční tým
+
+    Granularity:
+    Detail na úrovni klienta + produkt + interakce
+
+    Time aggregation:
+    Real-time / streaming + denní scoring
+
+    Freshness:
+    NBA do 5 min, churn scoring denně
+
+    Data sources:
+    - CRM
+    - Transakční historie
+    - Kampaňový systém / marketing
+    - Customer 360 profil
+    - Modelové výstupy (NBA + churn model)
+
+  owner: Nova Banka \ Team3 \ Obsluha klienta
+  contact:
+    name: Artur Zakharov
+    email: zaka09@vse.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: datamesh-nova-banka-prod
+    schema: customer_service_prod
+    table: dp_customer_service_customer_engagement
+
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: datamesh-nova-banka-dev
+    schema: customer_service_dev
+    table: dp_customer_service_customer_engagement
+
+schema:
+  - name: dp_customer_service_customer_engagement
+    description: Kombinace NBA doporučení a churn rizika pro obsluhu klienta (Sales-in-Service).
+    fields:
+      - name: event_id
+        type: string
+        description: Unique identifier of engagement event / recommendation (UUID).
+        required: true
+        unique: true
+        example: "550e8400-e29b-41d4-a716-446655440000"
+
+      - name: customer_id
+        type: string
+        description: Unique customer identifier.
+        required: true
+        example: "C123456789"
+
+      - name: interaction_id
+        type: string
+        description: Related interaction/event identifier (call/chat/branch session).
+        required: false
+        example: "INT-20260305-0001"
+
+      - name: product_code
+        type: string
+        description: Product related to the recommended action (optional).
+        required: false
+        example: "CARD_GOLD"
+
+      - name: action_type
+        type: string
+        description: Type of recommended action.
+        required: true
+        enum: [offer, retention, education]
+        example: "retention"
+
+      - name: nba_score
+        type: double
+        description: Relevance score of NBA recommendation (0..1).
+        required: false
+        example: 0.82
+
+      - name: churn_score
+        type: double
+        description: Probability of churn (0..1), typically daily score.
+        required: false
+        example: 0.64
+
+      - name: risk_signal_type
+        type: string
+        description: Churn risk signal type (optional).
+        required: false
+        example: "activity_drop"
+
+      - name: created_at
+        type: timestamp
+        description: Timestamp when the record was generated.
+        required: true
+        example: "2026-03-05T10:20:00Z"
+
+      - name: scoring_date
+        type: date
+        description: Business date of churn scoring snapshot (EOD), if applicable.
+        required: false
+        example: "2026-03-04"
+
+quality:
+  - rule: not_null
+    field: event_id
+    description: event_id nesmí být prázdné
+
+  - rule: unique
+    field: event_id
+    description: event_id musí být unikátní
+
+  - rule: not_null
+    field: customer_id
+    description: customer_id nesmí být prázdné
+
+  - rule: accepted_values
+    field: action_type
+    values: [offer, retention, education]
+    description: action_type musí být z definované množiny
+
+  - rule: range
+    field: nba_score
+    min: 0.0
+    max: 1.0
+    description: nba_score musí být v rozsahu 0..1 (pokud vyplněno)
+
+  - rule: range
+    field: churn_score
+    min: 0.0
+    max: 1.0
+    description: churn_score musí být v rozsahu 0..1 (pokud vyplněno)
+
+sla:
+  availability: 99.5%
+  data_latency: "NBA do 5 min; churn scoring denně"
+  retention_period: 24 months
+  support_contact: zaka09@vse.cz

@@ -1,0 +1,138 @@
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:customer-service:customer-profile
+
+info:
+  title: DP_CUSTOMER_SERVICE_CUSTOMER_PROFILE
+  name: Customer Profile for Omnichannel Service
+  maturity_score: 50%
+  version: 1.0.0
+  status: in development
+  description: |
+    Poskytnout jednotný 360° pohled na klienta pro potřeby omnichannel obsluhy
+
+    Value:
+    Zvýšení efektivity obsluhy, vyšší First Contact Resolution (FCR), růst NPS a snížení počtu eskalací.
+
+    Use Case:
+    Centralizovaný klientský profil konsolidující produkty, transakce, interakce, otevřené požadavky a zpětnou vazbu. Data jsou dostupná přímo v CRM při každém kontaktu s klientem.
+
+    Consumer:
+    Call centrum, pobočky, chat podpora, CRM aplikace
+
+    Granularity:
+    Detail na úrovni klienta (customer_id); doplňkově agregace dle segmentu/pobočky
+
+    Time aggregation:
+    Near real-time pro interakce + denní EOD pro zbytek
+
+    Freshness:
+    Interakce do 15 min, ostatní data T+1
+
+    Data sources:
+    - CRM
+    - Core Banking System (produkty a účty)
+    - Ticketing/Case management
+    - Digitální kanály (IB/MB logy)
+    - NPS/Feedback nástroj
+
+  owner: Nova Banka \ Team3 \ Obsluha klienta
+  contact:
+    name: Artur Zakharov
+    email: zaka09@vse.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: datamesh-nova-banka-prod
+    schema: customer_service_prod
+    table: dp_customer_service_customer_profile
+
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: datamesh-nova-banka-dev
+    schema: customer_service_dev
+    table: dp_customer_service_customer_profile
+
+schema:
+  - name: dp_customer_service_customer_profile
+    description: Centralizovaný klientský profil (Customer 360 view) dostupný v CRM při kontaktu s klientem.
+    fields:
+      - name: customer_id
+        type: string
+        description: Unique customer identifier.
+        required: true
+        unique: true
+        example: "C123456789"
+
+      - name: segment_code
+        type: string
+        description: Customer segment (optional drill-down).
+        required: false
+        example: "MASS"
+
+      - name: branch_id
+        type: string
+        description: Branch identifier for drill-down/ownership (optional).
+        required: false
+        example: "BR-0123"
+
+      - name: products_summary
+        type: string
+        description: Compact representation of products/accounts held by the customer (implementation-dependent).
+        required: false
+        example: "ACC:2;CARD:1"
+
+      - name: transactions_summary
+        type: string
+        description: Compact transaction summary (implementation-dependent).
+        required: false
+        example: "avg_monthly_spend=12500;salary_in=true"
+
+      - name: open_cases_count
+        type: integer
+        description: Number of open service requests/cases.
+        required: false
+        example: 1
+
+      - name: last_interaction_ts
+        type: timestamp
+        description: Timestamp of the most recent customer interaction (any channel).
+        required: false
+        example: "2026-03-05T10:15:00Z"
+
+      - name: last_nps_score
+        type: integer
+        description: Latest available NPS score (0..10).
+        required: false
+        example: 9
+
+      - name: data_as_of_date
+        type: date
+        description: Business date of the snapshot (EOD/T+1 for non-interaction domains).
+        required: true
+        example: "2026-03-04"
+
+quality:
+  - rule: not_null
+    field: customer_id
+    description: customer_id nesmí být prázdné
+
+  - rule: unique
+    field: customer_id
+    description: customer_id musí být unikátní v rámci produktu
+
+  - rule: range
+    field: last_nps_score
+    min: 0
+    max: 10
+    description: last_nps_score musí být v rozsahu 0..10 (pokud vyplněno)
+
+sla:
+  availability: 99.5%
+  data_latency: "Interakce do 15 min; ostatní data T+1"
+  retention_period: 36 months
+  support_contact: zaka09@vse.cz
