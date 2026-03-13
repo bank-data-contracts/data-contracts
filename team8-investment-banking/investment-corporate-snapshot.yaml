@@ -1,178 +1,170 @@
-dataContractSpecification: "0.9.3"
-id: "urn:dataproduct:investment-banking:investment-corporate-snapshot"
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:investment-banking:investment-corporate-snapshot
 
 info:
-  title: "Investment Corporate Snapshot"
-  version: "1.0"
-  status: "active"
+  title: DP_INVESTMENT_CORPORATE_SNAPSHOT
+  name: Investment Corporate Snapshot
+  version: 1.0.0
+  status: active
   description: |
-    Unified and cleaned dataset of corporate entities integrating internal bank client data
-    (CRM and accounting systems) with external market data sources (Cribis, Orbis).
-    The main value of the product is the technical standardization of financial statements
-    from local CAS accounting standards to globally comparable IFRS metrics.
-  owner: "Team 8 – Investment Banking"
+    Sjednocený dataset korporátních entit integrující interní data banky s externími zdroji.
+    Standardizace finančních výkazů z CAS na IFRS metriky.
+    Use Cases:
+    * UC1 - Investiční analýza
+    * UC2 - Credit risk scoring
+  owner: Nova Banka \ Investment Banking \ Tým 8
   contact:
-    name: "Head of Investment Banking (Data Product Owner)"
-    url: "<INTERNAL_CATALOG_OR_TEAM_CHANNEL_URL>"
-    email: "<DPO_EMAIL>@<BANK_DOMAIN>"
+    name: Head of Investment Banking
+    email: investment.banking@nova-banka.cz
 
 servers:
-  production:
-    type: "bigquery"
-    project: "<GCP_PROJECT_OR_PLATFORM_PROJECT>"
-    dataset: "<BQ_DATASET_NAME>"
-    description: "Cloud Data Platform – Data Warehouse layer containing the corporate snapshot dataset."
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: vse_banka
+    schema: investment_banking
+    table: dp_investment_corporate_snapshot
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: vse_banka
+    schema: investment_banking
+    table: dp_investment_corporate_snapshot
 
-terms:
-  usage: |
-    Internal analytical dataset used as the foundational corporate data layer for
-    investment analysis, clustering models and credit risk scoring.
-  limitations: |
-    Data contains sensitive internal corporate information and must be accessed only
-    by authorized users with appropriate permissions.
-  noticePeriod: "P3M"
-
-servicelevels:
-  availability:
-    description: "99.5% uptime for read interfaces."
-  freshness:
-    description: "Daily ingestion after market close (EOD). Data available by 08:00 each business day."
-  latency:
-    description: "Batch processing pipeline executed once per day."
-
-models:
-
-  corporate_snapshot:
-    type: "table"
-    description: |
-      Denormalized gold layer table containing standardized corporate entity data
-      including identifiers, financial indicators and structural attributes.
+schema:
+  - name: dp_investment_corporate_snapshot
+    description: Standardizovaná data korporátních entit
     fields:
-
-      company_id:
-        type: "text"
+      - name: company_id
+        type: string
+        description: Unikátní identifikátor společnosti (IČO nebo LEI)
         required: true
-        description: "Unique company identifier (IČO or LEI)."
-
-      company_name:
-        type: "text"
+      - name: company_name
+        type: string
+        description: Oficální název společnosti
         required: true
-        description: "Official registered company name."
-
-      nace_code:
-        type: "text"
+      - name: nace_code
+        type: string
+        description: Odvětvová klasifikace dle NACE
         required: true
-        description: "Industry classification according to NACE standard."
-
-      headquarters_country:
-        type: "text"
+      - name: revenue
+        type: decimal
+        description: Celkové tržby společnosti
         required: false
-        description: "Country of company headquarters."
-
-      owner_structure:
-        type: "text"
+      - name: ebitda
+        type: decimal
+        description: EBITDA převedená z CAS na IFRS
         required: false
-        description: "Ownership structure of the company."
-
-      revenue:
-        type: "decimal"
-        required: false
-        description: "Total company revenue standardized to a common reporting currency."
-
-      profit:
-        type: "decimal"
-        required: false
-        description: "Profit metric derived from standardized financial statements."
-
-      ebitda:
-        type: "decimal"
-        required: false
-        description: "EBITDA value converted from CAS accounting standard to IFRS equivalent."
-
-      financial_year:
-        type: "integer"
+      - name: financial_year
+        type: integer
+        description: Fiskální rok
         required: true
-        description: "Fiscal year for which financial metrics apply."
-
-      data_source:
-        type: "text"
+      - name: created_at
+        type: timestamp
+        description: Čas vygenerování záznamu
         required: true
-        description: "Source indicator identifying whether the data originates from internal or external systems."
-
-      created_at:
-        type: "timestamp"
-        required: true
-        description: "Timestamp when the record was generated in the pipeline."
-
-    primaryKey:
-      - company_id
-      - financial_year
-
 
 quality:
+  - rule: not_null
+    field: company_id
+    description: ID společnosti nesmí být prázdné
+  - rule: unique
+    field: company_id
+    description: Každá společnost musí mít unikátní ID
+  - rule: not_null
+    field: nace_code
+    description: NACE kód nesmí být prázdný
+
+sla:
+  availability: 99.5%
+  data_latency: D+1
+  retention_period: 60
+cat > team8-investment-banking/investment-peer-benchmark-profile.yaml << 'EOF'
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:investment-banking:investment-peer-benchmark-profile
+
+info:
+  title: DP_INVESTMENT_PEER_BENCHMARK_PROFILE
+  name: Investment Peer Benchmark Profile
+  version: 1.0.0
+  status: active
   description: |
-    Data quality validation rules ensuring the accuracy and completeness of corporate records
-    before publication to downstream analytical data products.
-  checks:
+    Analytický produkt identifikující statisticky podobné společnosti pomocí clusteringu.
+    Use Cases:
+    * UC1 - Investiční benchmarking
+    * UC2 - Korporátní risk profiling
+  owner: Nova Banka \ Investment Banking \ Tým 8
+  contact:
+    name: Head of Investment Banking
+    email: investment.banking@nova-banka.cz
 
-    - model: corporate_snapshot
-      assertions:
-        - "row_count > 0"
-        - "not_null(company_id)"
-        - "unique(company_id, financial_year)"
-        - "not_null(nace_code)"
-        - "value_range(revenue, 0, )"
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: vse_banka
+    schema: investment_banking
+    table: dp_investment_peer_benchmark_profile
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: vse_banka
+    schema: investment_banking
+    table: dp_investment_peer_benchmark_profile
 
-x-data-product:
+schema:
+  - name: dp_investment_peer_benchmark_profile
+    description: Peer group přiřazení a benchmark metriky
+    fields:
+      - name: as_of_date
+        type: date
+        description: Business datum pro které je benchmark vypočítán
+        required: true
+      - name: company_id
+        type: string
+        description: Identifikátor korporátní entity
+        required: true
+      - name: peer_group_id
+        type: string
+        description: Identifikátor peer clusteru
+        required: true
+      - name: similarity_score
+        type: decimal
+        description: Skóre podobnosti společnosti k peer group
+        required: true
+      - name: revenue
+        type: decimal
+        description: Tržby
+        required: false
+      - name: ebitda
+        type: decimal
+        description: EBITDA
+        required: false
+      - name: created_at
+        type: timestamp
+        description: Čas vygenerování záznamu
+        required: true
 
-  classification: "Source-aligned Data Product"
+quality:
+  - rule: not_null
+    field: as_of_date
+    description: Datum nesmí být prázdné
+  - rule: not_null
+    field: company_id
+    description: ID společnosti nesmí být prázdné
+  - rule: not_null
+    field: peer_group_id
+    description: ID peer group nesmí být prázdné
+  - rule: range
+    field: similarity_score
+    description: Similarity score musí být 0 až 1
 
-  domain: "Investment Banking / Corporate Finance"
-
-  domainOwner: "Head of Investment Banking"
-
-  consumers:
-    - "Investment Banking Analytics Team"
-    - "Risk Management"
-
-  delivery:
-    platform: "Cloud Data Platform (Data Warehouse Layer)"
-    accessChannels:
-      - "JDBC / ODBC connectors"
-      - "REST API"
-    metadata: "Business Glossary – Dawiso"
-
-  lineage:
-
-    upstream:
-      - name: "Orbis"
-        type: "external-source"
-      - name: "Cribis"
-        type: "external-source"
-      - name: "Bank CRM"
-        type: "internal-system"
-      - name: "Bank Accounting Systems"
-        type: "internal-system"
-
-    downstream:
-      - name: "Investment Peer Benchmark Profile"
-        type: "data-product"
-      - name: "Credit Risk Customer Underwriting Profile"
-        type: "data-product"
-
-  governance:
-
-    classification: "Confidential"
-
-    pii_handling: |
-      Identification of statutory representatives (natural persons) may appear
-      in source systems. Such attributes must be masked for users without
-      appropriate need-to-know permissions.
-
-  retention:
-    description: "Financial history retained for the duration of mandate plus 5 years for regulatory purposes."
-
-  rules_ko:
-    - "Company must have active registration status in the business register."
-    - "Each record must contain a valid IČO or LEI identifier."
-    - "Revenue must not be negative; otherwise the pipeline is stopped."
+sla:
+  availability: 99.5%
+  data_latency: D+1
+  retention_period: 60 months
+  support_contact: investment.banking@nova-banka.cz

@@ -1,85 +1,82 @@
-apiVersion: v3.1.0
-kind: DataContract
-id: esg-risk-energy-profile
-name: ESG Risk Energy Profile
-version: 1.0.0
-status: proposed
-description:
-  purpose: "Automatizace odhadu energetické náročnosti budov pro účely valuace a reportingu."
-  usage: "Na základě GPS lokace se vypočítá hodnota energetického štítku pro schvalování úvěru a reporting (EU Taxonomie)."
-  limitations: "Odhad založený na statistických modelech a meteo datech, nikoliv na fyzické prohlídce."
-  customProperties:
-    - property: "concept_ids"
-      value: "592, 637, 1126, 1290, 1310"
-    - property: "capability"
-      value: "Analytical & Scoring Engines, Data Delivery & Compliance"
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:esg-risk:esg-risk-energy-profile
+
+info:
+  title: DP_ESG_RISK_ENERGY_PROFILE
+  name: ESG Risk Energy Profile
+  version: 1.0.0
+  status: in development
+  description: |
+    Automatizace odhadu energetické náročnosti budov pro účely valuace a reportingu.
+    Na základě GPS lokace se vypočítá hodnota energetického štítku pro schvalování úvěru.
+    Data latency: denní aktualizace
+    Use Cases:
+    * UC1 - Odhad energetického štítku pro schvalování úvěru
+    * UC2 - EU Taxonomie reporting
+  owner: Nova Banka \ Risk \ ESG Tým 5
+  contact:
+    name: ESG Owner
+    email: martin.hanus@bank.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: vse_banka
+    schema: esg_risk
+    table: dp_esg_risk_energy_profile
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: vse_banka
+    schema: esg_risk
+    table: dp_esg_risk_energy_profile
 
 schema:
-  - name: energy_profiles
-    physicalType: TABLE
-    description: "Odhadované parametry energetické náročnosti na úrovni budovy."
-    properties:
+  - name: dp_esg_risk_energy_profile
+    description: Odhadované parametry energetické náročnosti na úrovni budovy
+    fields:
       - name: building_id
-        logicalType: string
-        businessName: Building Identifier
-        description: "Unikátní identifikátor budovy z Katastru nemovitostí."
-        physicalType: VARCHAR
-        examples:
-          - "LV-12345-PRG"
-        primaryKey: true
+        type: string
+        description: Unikátní identifikátor budovy z Katastru nemovitostí
         required: true
         unique: true
       - name: gps_latitude
-        logicalType: number
-        businessName: GPS Latitude
-        description: "Zeměpisná šířka budovy."
-        physicalType: DOUBLE
-        examples:
-          - 50.0755
+        type: decimal
+        description: Zeměpisná šířka budovy
         required: true
       - name: gps_longitude
-        logicalType: number
-        businessName: GPS Longitude
-        description: "Zeměpisná délka budovy."
-        physicalType: DOUBLE
-        examples:
-          - 14.4378
+        type: decimal
+        description: Zeměpisná délka budovy
         required: true
       - name: energy_label_estimated
-        logicalType: string
-        businessName: Estimated Energy Label
-        description: "Odhadovaná energetická třída (A až G)."
-        physicalType: TEXT
-        examples:
-          - "B"
-        quality:
-          - type: library
-            metric: invalidValues
-            arguments:
-              validValues: ["A", "B", "C", "D", "E", "F", "G"]
-            mustBe: 0
+        type: string
+        description: Odhadovaná energetická třída (A až G)
+        required: true
+      - name: created_at
+        type: timestamp
+        description: Čas vygenerování záznamu
+        required: true
 
-team:
-  name: "Risk (ESG) tým"
-  description: "Vlastník procesu odhadu energetické náročnosti."
-  members:
-    - username: martin.hanus@bank.cz
-      name: ESG Owner
-      role: Owner
-    - username: anna.spilkova@bank.cz
-      name: Head of ESG Risk
-      role: Owner
-    - username: marketa.honcikova@bank.cz
-      name: Data Scientist
-      role: Owner
-    - username: matej.koys@bank.cz
-      name: Data Engineer
-      role: Owner
-    - username: erik.seidl@bank.cz
-      name: Risk Quant Analytik
-      role: Owner
-tags:
-  - energy-efficiency
-  - scoring
+quality:
+  - rule: not_null
+    field: building_id
+    description: ID budovy nesmí být prázdné
+  - rule: unique
+    field: building_id
+    description: Každá budova musí mít unikátní ID
+  - rule: not_null
+    field: energy_label_estimated
+    description: Energetická třída nesmí být prázdná
+  - rule: accepted_values
+    field: energy_label_estimated
+    values: [A, B, C, D, E, F, G]
+    description: Energetická třída musí být A až G
 
-contractCreatedTs: "2026-03-05T11:00:00Z"
+sla:
+  availability: 99.0%
+  data_latency: D+1
+  retention_period: 36 months
+  support_contact: martin.hanus@bank.cz

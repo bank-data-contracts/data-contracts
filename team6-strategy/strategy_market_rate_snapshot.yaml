@@ -1,48 +1,76 @@
-kind: DataContract
-version: 1.0.0
-dataset:
-  name: strategy_kpi_aggregation # Zástupný název podle předchozího kontextu (Tým 6)
-  domain: strategy
-  owner: team_6_strategy
-  description: "Agregovaný datový produkt obsahující klíčové strategické metriky banky pro měření ambice anticipativního bankovnictví."
+dataContractSpecification: 1.1.0
+id: urn:businessdomain:nova-banka:strategy:strategy-kpi-aggregation
+
+info:
+  title: DP_STRATEGY_KPI_AGGREGATION
+  name: Strategy KPI Aggregation
+  version: 1.0.0
+  status: in development
+  description: |
+    Agregovaný datový produkt obsahující klíčové strategické metriky banky.
+    Měření ambice anticipativního bankovnictví.
+    Use Cases:
+    * UC1 - Strategický reporting pro C-level
+    * UC2 - Sledování NPS a automatizace
+  owner: Nova Banka \ Strategy \ Tým 6
+  contact:
+    name: Strategy Team
+    email: strategy@nova-banka.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: vse_banka
+    schema: strategie
+    table: dp_strategy_kpi_aggregation
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: vse_banka
+    schema: strategie
+    table: dp_strategy_kpi_aggregation
 
 schema:
-  type: tabular
-  columns:
-    - name: report_date
-      type: date
-      description: "Referenční datum reportingu"
-      is_primary_key: true
-    - name: nps_score
-      type: decimal
-      description: "Net Promoter Score (agregováno z Customer Service)"
-    - name: cost_to_serve
-      type: decimal
-      description: "Průměrné náklady na obsluhu klienta (Cost-to-Serve)"
-    - name: automated_resolution_rate
-      type: decimal
-      description: "ARR - Podíl požadavků vyřešených umělou inteligencí bez zásahu člověka"
+  - name: dp_strategy_kpi_aggregation
+    description: Klíčové strategické metriky banky
+    fields:
+      - name: report_date
+        type: date
+        description: Referenční datum reportingu
+        required: true
+      - name: nps_score
+        type: decimal
+        description: Net Promoter Score
+        required: false
+      - name: cost_to_serve
+        type: decimal
+        description: Průměrné náklady na obsluhu klienta
+        required: false
+      - name: automated_resolution_rate
+        type: decimal
+        description: Podíl požadavků vyřešených AI bez zásahu člověka
+        required: false
+      - name: created_at
+        type: timestamp
+        description: Čas vygenerování záznamu
+        required: true
 
 quality:
-  checks:
-    - column: nps_score
-      type: range
-      min: -100
-      max: 100
-    - column: automated_resolution_rate
-      type: range
-      min: 0
-      max: 1
-    - column: report_date
-      type: not_null
+  - rule: not_null
+    field: report_date
+    description: Datum reportingu nesmí být prázdné
+  - rule: range
+    field: nps_score
+    description: NPS musí být v intervalu -100 až 100
+  - rule: range
+    field: automated_resolution_rate
+    description: ARR musí být v intervalu 0 až 1
 
 sla:
-  update_frequency: "0 6 * * *" # Cron expression (denně v 6:00)
-  freshness: 24h
   availability: 99.5%
-
-security:
-  pii_contains: false
-  access_roles:
-    - strategy_analyst
-    - c_level_exec
+  data_latency: D+1
+  retention_period: 36 months
+  support_contact: strategy@nova-banka.cz
