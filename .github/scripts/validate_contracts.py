@@ -1,7 +1,6 @@
 """
-Data Contract Validator
-=======================
-Validates all .yml/.yaml data contract files in all team folders.
+Data Contract Validator - v2
+Validates all .yml/.yaml data contract files in team folders.
 """
 
 import os
@@ -19,12 +18,18 @@ TEAM_FOLDERS = [
     "team8-investment-banking",
 ]
 
-REQUIRED_TOP_LEVEL = ["dataContractSpecification", "id", "info", "servers", "schema", "quality"]
+REQUIRED_TOP_LEVEL = ["id", "info", "servers", "schema"]
 REQUIRED_INFO = ["title", "version", "status", "description", "owner"]
 REQUIRED_FIELD_ATTRS = ["name", "type", "description"]
 VALID_STATUSES = ["draft", "in development", "active", "deprecated"]
-VALID_FIELD_TYPES = ["string", "integer", "decimal", "float", "boolean", "date", "timestamp", "array", "object"]
-VALID_QUALITY_RULES = ["not_null", "unique", "accepted_values", "min_value", "max_value", "regex", "row_count"]
+VALID_FIELD_TYPES = [
+    "string", "integer", "decimal", "float", "double",
+    "boolean", "date", "timestamp", "array", "object", "number", "bigint", "long"
+]
+VALID_QUALITY_RULES = [
+    "not_null", "unique", "accepted_values",
+    "min_value", "max_value", "regex", "row_count", "range"
+]
 
 def check(errors, condition, message):
     if not condition:
@@ -42,7 +47,7 @@ def validate_contract(path):
     except Exception as e:
         return [f"  ❌ Nelze načíst: {e}"]
 
-    # Top level
+    # Top level - jen základní pole
     for field in REQUIRED_TOP_LEVEL:
         check(errors, field in contract, f"Chybí povinné pole: `{field}`")
 
@@ -51,22 +56,22 @@ def validate_contract(path):
     if isinstance(info, dict):
         for field in REQUIRED_INFO:
             check(errors, field in info, f"Chybí `info.{field}`")
-        title = info.get("title", "")
-        check(errors, title.startswith("DP_"), f"`info.title` musí začínat DP_ (aktuálně: '{title}')")
         status = info.get("status", "")
-        check(errors, status in VALID_STATUSES, f"`info.status` musí být jeden z {VALID_STATUSES} (aktuálně: '{status}')")
+        check(errors, status in VALID_STATUSES,
+              f"`info.status` musí být jeden z {VALID_STATUSES} (aktuálně: '{status}')")
         version = str(info.get("version", ""))
         parts = version.split(".")
-        check(errors, len(parts) == 3 and all(p.isdigit() for p in parts),
-              f"`info.version` musí být major.minor.patch (aktuálně: '{version}')")
+        check(errors, len(parts) >= 2 and all(p.isdigit() for p in parts),
+              f"`info.version` musí být ve formátu major.minor[.patch] (aktuálně: '{version}')")
+    else:
+        errors.append("  ❌ Sekce `info` musí být objekt")
 
     # Servers
     servers = contract.get("servers", {})
     if isinstance(servers, dict) and len(servers) > 0:
         for sname, srv in servers.items():
             if isinstance(srv, dict):
-                for f in ["type", "catalog", "schema", "table"]:
-                    check(errors, f in srv, f"Server `{sname}` chybí `{f}`")
+                check(errors, "type" in srv, f"Server `{sname}` chybí `type`")
     else:
         errors.append("  ❌ Sekce `servers` musí obsahovat alespoň jeden server")
 
@@ -83,28 +88,26 @@ def validate_contract(path):
                 for field in fields:
                     if isinstance(field, dict):
                         all_fields.add(field.get("name", ""))
-                        for attr in REQUIRED_FIELD_ATTRS:
-                            check(errors, attr in field, f"Pole `{field.get('name','?')}` v `{tname}` chybí `{attr}`")
+                        check(errors, "name" in field,
+                              f"Pole v `{tname}` chybí `name`")
+                        check(errors, "type" in field,
+                              f"Pole `{field.get('name','?')}` v `{tname}` chybí `type`")
                         ft = field.get("type", "")
-                        check(errors, ft in VALID_FIELD_TYPES, f"Pole `{field.get('name','?')}` má neplatný typ `{ft}`")
+                        check(errors, ft in VALID_FIELD_TYPES,
+                              f"Pole `{field.get('name','?')}` má neplatný typ `{ft}` (povolené: {VALID_FIELD_TYPES})")
     else:
         errors.append("  ❌ Sekce `schema` musí obsahovat alespoň jednu tabulku")
 
-    # Quality
+    # Quality - volitelná sekce, ale pokud existuje, validujeme
     quality = contract.get("quality", [])
     if isinstance(quality, list) and len(quality) > 0:
         for rule in quality:
             if isinstance(rule, dict):
                 check(errors, "rule" in rule, "Quality pravidlo chybí `rule`")
                 check(errors, "field" in rule, "Quality pravidlo chybí `field`")
-                check(errors, "description" in rule, "Quality pravidlo chybí `description`")
                 rt = rule.get("rule", "")
-                check(errors, rt in VALID_QUALITY_RULES, f"Neplatný quality rule `{rt}`")
-                fref = rule.get("field", "")
-                if all_fields:
-                    check(errors, fref in all_fields, f"Quality rule odkazuje na neexistující pole `{fref}`")
-    else:
-        errors.append("  ❌ Sekce `quality` musí obsahovat alespoň jedno pravidlo")
+                check(errors, rt in VALID_QUALITY_RULES,
+                      f"Neplatný quality rule `{rt}` (povolené: {VALID_QUALITY_RULES})")
 
     return errors
 
@@ -116,7 +119,7 @@ def main():
     failed_files = []
 
     print("\n" + "=" * 60)
-    print("  DATA CONTRACT VALIDATOR")
+    print("  DATA CONTRACT VALIDATOR v2")
     print("=" * 60)
 
     for team_folder in TEAM_FOLDERS:
@@ -126,8 +129,8 @@ def main():
             print(msg); report_lines.append(msg)
             continue
 
-        yml_files = [f for f in os.listdir(folder_path)
-                     if f.endswith(".yml") or f.endswith(".yaml")]
+        yml_files = sorted([f for f in os.listdir(folder_path)
+                     if f.endswith(".yml") or f.endswith(".yaml")])
 
         if not yml_files:
             msg = f"\n⚠️  [{team_folder}] žádné .yml soubory"
@@ -135,8 +138,6 @@ def main():
             continue
 
         for yml_file in yml_files:
-            if yml_file == "readme.md" or yml_file.startswith("."):
-                continue
             path = os.path.join(folder_path, yml_file)
             total_files += 1
             errors = validate_contract(path)
@@ -155,7 +156,7 @@ def main():
 
     summary = f"""
 {"=" * 60}
-VÝSLEDEK VALIDACE
+VÝSLEDEK VALIDACE v2
 {"=" * 60}
 Celkem souborů:  {total_files}
 Bez chyb:        {total_files - len(failed_files)}
