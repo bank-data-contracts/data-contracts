@@ -8,9 +8,7 @@ info:
   status: active
   description: |
     Sjednocený dataset korporátních entit integrující interní data banky s externími zdroji.
-    Use Cases:
-    * UC1 - Investiční analýza
-    * UC2 - Credit risk scoring
+    Use Cases: Investiční analýza, Credit risk scoring
   owner: Nova Banka \ Investment Banking \ Tým 8
   contact:
     name: Head of Investment Banking
@@ -44,10 +42,6 @@ schema:
       - name: revenue
         type: decimal
         description: Celkové tržby společnosti
-        required: false
-      - name: ebitda
-        type: decimal
-        description: EBITDA převedená z CAS na IFRS
         required: false
       - name: financial_year
         type: integer
