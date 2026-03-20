@@ -1,6 +1,8 @@
 """
-Data Contract Validator - v4
+Data Contract Validator - v5
 Validates all .yml/.yaml data contract files in team folders.
+Checks: structure, info, servers, schema (x-compliance), quality (row_count),
+        x-regulatory, x-dawiso (data_product + glossary_entry)
 """
 
 import os
@@ -22,7 +24,9 @@ REQUIRED_TOP_LEVEL = ["id", "info", "servers", "schema"]
 REQUIRED_INFO = ["title", "version", "status", "description", "owner"]
 REQUIRED_FIELD_ATTRS = ["name", "type", "description"]
 REQUIRED_SERVER_ATTRS = ["type", "host", "catalog", "schema", "table"]
+
 VALID_STATUSES = ["draft", "in development", "active", "deprecated"]
+VALID_PRODUCT_TYPES = ["EVENT", "STATE", "AGGREGATION"]
 VALID_FIELD_TYPES = [
     "string", "integer", "decimal", "float", "double",
     "boolean", "date", "timestamp", "array", "object", "number", "bigint", "long"
@@ -33,10 +37,23 @@ VALID_QUALITY_RULES = [
 ]
 VALID_SENSITIVITIES = ["Internal", "Confidential", "Public", "Restricted"]
 VALID_LEGAL_BASES = ["Contractual", "Consent", "Legal Obligation"]
+VALID_REGULATORY_FRAMEWORKS = ["GDPR", "BCBS 239", "IFRS 9", "AML", "MiFID II", "None"]
+
+REQUIRED_DATA_PRODUCT_ATTRS = [
+    "dawiso_status", "domain", "business_owner", "product_owner",
+    "data_steward", "classification", "data_classification"
+]
+REQUIRED_GLOSSARY_ATTRS = [
+    "term", "definition", "fibo_class", "domain", "dawiso_status", "steward"
+]
+VALID_DAWISO_DP_STATUSES = ["design", "in_development", "published", "obsolete"]
+VALID_DAWISO_GL_STATUSES = ["draft", "in_review", "approved", "published"]
+
 
 def check(errors, condition, message):
     if not condition:
         errors.append(f"  ❌ {message}")
+
 
 def validate_contract(path):
     errors = []
@@ -50,26 +67,47 @@ def validate_contract(path):
     except Exception as e:
         return [f"  ❌ Nelze načíst: {e}"]
 
-    # Top level
+    # ── Top level ────────────────────────────────────────────
     for field in REQUIRED_TOP_LEVEL:
         check(errors, field in contract, f"Chybí povinné pole: `{field}`")
 
-    # Info
+    # ── Info ─────────────────────────────────────────────────
     info = contract.get("info", {})
     if isinstance(info, dict):
         for field in REQUIRED_INFO:
             check(errors, field in info, f"Chybí `info.{field}`")
+
         status = info.get("status", "")
         check(errors, status in VALID_STATUSES,
               f"`info.status` musí být jeden z {VALID_STATUSES} (aktuálně: '{status}')")
+
         version = str(info.get("version", ""))
         parts = version.split(".")
         check(errors, len(parts) >= 2 and all(p.isdigit() for p in parts),
               f"`info.version` musí být ve formátu major.minor[.patch] (aktuálně: '{version}')")
+
+        # v5: product_type required
+        pt = info.get("product_type", "")
+        check(errors, pt in VALID_PRODUCT_TYPES,
+              f"`info.product_type` musí být jeden z {VALID_PRODUCT_TYPES} (aktuálně: '{pt}')")
+
+        # v5: x-regulatory required
+        xreg = info.get("x-regulatory")
+        check(errors, isinstance(xreg, dict),
+              "`info.x-regulatory` chybí nebo není objekt")
+        if isinstance(xreg, dict):
+            check(errors, "gdpr_relevant" in xreg,
+                  "`info.x-regulatory` chybí `gdpr_relevant`")
+            check(errors, "critical_data_element" in xreg,
+                  "`info.x-regulatory` chybí `critical_data_element`")
+            rf = xreg.get("regulatory_framework", "")
+            check(errors, rf in VALID_REGULATORY_FRAMEWORKS,
+                  f"`info.x-regulatory.regulatory_framework` musí být jeden z "
+                  f"{VALID_REGULATORY_FRAMEWORKS} (aktuálně: '{rf}')")
     else:
         errors.append("  ❌ Sekce `info` musí být objekt")
 
-    # Servers — fix #5: validate required server attributes
+    # ── Servers ──────────────────────────────────────────────
     servers = contract.get("servers", {})
     if isinstance(servers, dict) and len(servers) > 0:
         for sname, srv in servers.items():
@@ -80,8 +118,7 @@ def validate_contract(path):
     else:
         errors.append("  ❌ Sekce `servers` musí obsahovat alespoň jeden server")
 
-    # Schema — fix #2: collect field names for quality cross-check
-    #           fix #4: catch tables with no fields
+    # ── Schema ───────────────────────────────────────────────
     schema = contract.get("schema", [])
     all_fields = set()
     if isinstance(schema, list) and len(schema) > 0:
@@ -90,7 +127,6 @@ def validate_contract(path):
                 continue
             tname = table.get("name", "?")
             fields = table.get("fields", [])
-            # fix #4: empty or missing fields list
             check(errors, isinstance(fields, list) and len(fields) > 0,
                   f"Tabulka `{tname}` neobsahuje žádná pole (`fields`)")
             if isinstance(fields, list):
@@ -99,14 +135,14 @@ def validate_contract(path):
                         fname = field.get("name", "")
                         if fname:
                             all_fields.add(fname)
-                        # fix #1: enforce all REQUIRED_FIELD_ATTRS (name, type, description)
                         for attr in REQUIRED_FIELD_ATTRS:
                             check(errors, attr in field,
                                   f"Pole `{fname or '?'}` v `{tname}` chybí `{attr}`")
                         ft = field.get("type", "")
                         check(errors, ft in VALID_FIELD_TYPES,
-                              f"Pole `{fname or '?'}` má neplatný typ `{ft}` (povolené: {VALID_FIELD_TYPES})")
-                        # v4: x-compliance required on every field
+                              f"Pole `{fname or '?'}` má neplatný typ `{ft}` "
+                              f"(povolené: {VALID_FIELD_TYPES})")
+                        # x-compliance required on every field
                         xc = field.get("x-compliance")
                         check(errors, xc is not None,
                               f"Pole `{fname or '?'}` v `{tname}` chybí sekce `x-compliance`")
@@ -118,16 +154,19 @@ def validate_contract(path):
                             sens = xc.get("sensitivity", "")
                             if sens:
                                 check(errors, sens in VALID_SENSITIVITIES,
-                                      f"Pole `{fname or '?'}` — `sensitivity` musí být jeden z {VALID_SENSITIVITIES} (aktuálně: '{sens}')")
+                                      f"Pole `{fname or '?'}` — `sensitivity` musí být jeden z "
+                                      f"{VALID_SENSITIVITIES} (aktuálně: '{sens}')")
                             if xc.get("is_pii") is True:
                                 lb = xc.get("legal_basis", "")
                                 check(errors, lb in VALID_LEGAL_BASES,
-                                      f"Pole `{fname or '?'}` je PII — `legal_basis` musí být jeden z {VALID_LEGAL_BASES} (aktuálně: '{lb}')")
+                                      f"Pole `{fname or '?'}` je PII — `legal_basis` musí být "
+                                      f"jeden z {VALID_LEGAL_BASES} (aktuálně: '{lb}')")
     else:
         errors.append("  ❌ Sekce `schema` musí obsahovat alespoň jednu tabulku")
 
-    # Quality — fix #3: cross-check rule.field against collected schema fields
+    # ── Quality ──────────────────────────────────────────────
     quality = contract.get("quality", [])
+    has_row_count = False
     if isinstance(quality, list) and len(quality) > 0:
         for rule in quality:
             if isinstance(rule, dict):
@@ -136,18 +175,56 @@ def validate_contract(path):
                 check(errors, rt in VALID_QUALITY_RULES,
                       f"Neplatný quality rule `{rt}` (povolené: {VALID_QUALITY_RULES})")
                 if rt == "row_count":
-                    # v4: row_count is table-level — no field required, but min or max must be set
+                    has_row_count = True
                     check(errors, "min" in rule or "max" in rule,
                           "Quality rule `row_count` musí mít `min` nebo `max`")
                 else:
-                    # all other rules must reference a field
-                    check(errors, "field" in rule, f"Quality pravidlo `{rt}` chybí `field`")
+                    check(errors, "field" in rule,
+                          f"Quality pravidlo `{rt}` chybí `field`")
                     rf = rule.get("field", "")
                     if rf and all_fields:
                         check(errors, rf in all_fields,
-                              f"Quality rule odkazuje na neexistující pole `{rf}` (dostupná pole: {sorted(all_fields)})")
+                              f"Quality rule odkazuje na neexistující pole `{rf}` "
+                              f"(dostupná pole: {sorted(all_fields)})")
+
+    # v5: row_count is mandatory
+    check(errors, has_row_count,
+          "Chybí povinný quality rule `row_count` (detekce distribučních anomálií)")
+
+    # ── x-dawiso ─────────────────────────────────────────────
+    # v5: x-dawiso with data_product + glossary_entry required
+    xd = contract.get("x-dawiso")
+    check(errors, isinstance(xd, dict),
+          "Chybí sekce `x-dawiso` (povinná pro Dawiso integraci)")
+    if isinstance(xd, dict):
+        # data_product
+        dp = xd.get("data_product")
+        check(errors, isinstance(dp, dict),
+              "`x-dawiso.data_product` chybí nebo není objekt")
+        if isinstance(dp, dict):
+            for attr in REQUIRED_DATA_PRODUCT_ATTRS:
+                check(errors, attr in dp,
+                      f"`x-dawiso.data_product` chybí `{attr}`")
+            ds = dp.get("dawiso_status", "")
+            check(errors, ds in VALID_DAWISO_DP_STATUSES,
+                  f"`x-dawiso.data_product.dawiso_status` musí být jeden z "
+                  f"{VALID_DAWISO_DP_STATUSES} (aktuálně: '{ds}')")
+
+        # glossary_entry
+        ge = xd.get("glossary_entry")
+        check(errors, isinstance(ge, dict),
+              "`x-dawiso.glossary_entry` chybí nebo není objekt")
+        if isinstance(ge, dict):
+            for attr in REQUIRED_GLOSSARY_ATTRS:
+                check(errors, attr in ge,
+                      f"`x-dawiso.glossary_entry` chybí `{attr}`")
+            gs = ge.get("dawiso_status", "")
+            check(errors, gs in VALID_DAWISO_GL_STATUSES,
+                  f"`x-dawiso.glossary_entry.dawiso_status` musí být jeden z "
+                  f"{VALID_DAWISO_GL_STATUSES} (aktuálně: '{gs}')")
 
     return errors
+
 
 def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -157,7 +234,7 @@ def main():
     failed_files = []
 
     print("\n" + "=" * 60)
-    print("  DATA CONTRACT VALIDATOR v4")
+    print("  DATA CONTRACT VALIDATOR v5")
     print("=" * 60)
 
     for team_folder in TEAM_FOLDERS:
@@ -195,7 +272,7 @@ def main():
     passed = total_files - len(failed_files)
     summary = f"""
 {"=" * 60}
-VÝSLEDEK VALIDACE v4
+VÝSLEDEK VALIDACE v5
 {"=" * 60}
 Celkem souborů:       {total_files}
 Souborů bez chyb:     {passed}
@@ -214,6 +291,7 @@ Celkem chyb:          {total_errors}  (v {len(failed_files)} souborech)
     else:
         print("✅ Všechny data contracty jsou validní!")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

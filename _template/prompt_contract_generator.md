@@ -79,11 +79,11 @@ info:
     Consumers:        <consumers>
     Data Sources:     <sources>
 
-  # Regulatory Context
-  GDPR Relevant: <true/false>
-  Critical Data Element: <true/false>
-  Regulatory Framework: "<Assigned Framework, e.g., GDPR, BCBS 239, IFRS 9>"
-  
+  x-regulatory:
+    gdpr_relevant: <true/false>
+    critical_data_element: <true/false>
+    regulatory_framework: "<GDPR | BCBS 239 | IFRS 9 | AML | MiFID II | None>"
+
   owner: Nova Banka \ <TeamN> \ <Domain>
   contact:
     name: <contact name>
