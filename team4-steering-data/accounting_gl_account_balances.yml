@@ -6,6 +6,11 @@ info:
   maturity_score: 60%
   version: 1.0.0
   status: in development
+  product_type: STATE
+  x-regulatory:
+    gdpr_relevant: false
+    critical_data_element: true
+    regulatory_framework: "BCBS 239"
   description: 'Data produkt poskytuje sjednocený pohled na zůstatky hlavní knihy
     s vazbou na GCOA.
 
@@ -111,6 +116,10 @@ quality:
 - rule: not_null
   field: gl_balance
   description: Hodnota zůstatku nesmí být prázdná
+- rule: row_count
+  min: 100
+  max: 500000
+  description: Detects data distribution anomalies in daily GL account balance records
 sla:
   availability: 99.5%
   data_latency: T+1

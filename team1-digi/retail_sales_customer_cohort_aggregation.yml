@@ -6,6 +6,11 @@ info:
   maturity_score: 65%
   version: 1.0.0
   status: in development
+  product_type: AGGREGATION
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: false
+    regulatory_framework: GDPR
   description: 'Datový produkt sleduje aktivaci nově získaných klientů
 
     a jejich první interakce s bankovními službami.
@@ -111,6 +116,10 @@ quality:
   field: customer_id
 - rule: not_null
   field: activation_timestamp
+- rule: row_count
+  min: 100
+  max: 5000000
+  description: Detects data distribution anomalies in daily customer cohort records
 sla:
   availability: 99.5%
   data_latency: EOD

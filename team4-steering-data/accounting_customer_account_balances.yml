@@ -6,6 +6,11 @@ info:
   maturity_score: 60%
   version: 1.0.0
   status: in development
+  product_type: STATE
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: true
+    regulatory_framework: "BCBS 239"
   description: 'Data produkt poskytuje standardizovaný pohled na všechny klientské
     účty a úvěry bez ohledu na to, v jakém core systému vznikly.
 
@@ -142,6 +147,10 @@ quality:
 - rule: not_null
   field: customer_balance
   description: Hodnota zůstatku klienta nesmí být prázdná
+- rule: row_count
+  min: 1000
+  max: 10000000
+  description: Detects data distribution anomalies in daily customer account balance records
 sla:
   availability: 99.5%
   data_latency: T+1

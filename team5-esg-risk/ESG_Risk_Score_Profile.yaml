@@ -19,12 +19,15 @@ info:
       ČSÚ (Czech Statistical Office — quality-of-life index),
       PČR (Czech Police — crime index)
  
+  owner: Nova Banka
   x-regulatory:
     gdpr_relevant: true
     critical_data_element: true
-    regulatory_framework: "GDPR, BCBS 239, IFRS 9"
- 
-owner: Nova Banka
+    regulatory_framework:
+      - GDPR
+      - "BCBS 239"
+      - "IFRS 9"
+
 contact:
   name: Anna Spilková
   email: spia05@vse.cz

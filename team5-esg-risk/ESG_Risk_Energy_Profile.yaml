@@ -16,12 +16,14 @@ info:
     Consumers: Customer Service (Obsluha klienta)
     Data Sources: ICM Gen AI, Public Registries (RUIAN, VÚV TGM, CHMI)
  
+  owner: Nova Banka
   x-regulatory:
     gdpr_relevant: true
     critical_data_element: true
-    regulatory_framework: "GDPR, BCBS 239"
- 
-owner: Nova Banka
+    regulatory_framework:
+      - GDPR
+      - "BCBS 239"
+
 contact:
   name: Anna Spilková
   email: spia05@vse.cz

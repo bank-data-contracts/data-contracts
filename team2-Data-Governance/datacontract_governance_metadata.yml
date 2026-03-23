@@ -5,6 +5,11 @@ info:
   name: Data Governance Metadata Profile
   version: 1.0.0
   status: in development
+  product_type: STATE
+  x-regulatory:
+    gdpr_relevant: false
+    critical_data_element: false
+    regulatory_framework: None
   description: 'Metadata o datových produktech banky.
 
     Use Cases:
@@ -76,6 +81,10 @@ quality:
 - rule: not_null
   field: product_name
   description: Název nesmí být prázdný
+- rule: row_count
+  min: 1
+  max: 10000
+  description: Detects data distribution anomalies in governance metadata records
 sla:
   availability: 99.0%
   data_latency: D+1

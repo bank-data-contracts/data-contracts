@@ -6,6 +6,11 @@ info:
   maturity_score: 65%
   version: 1.0.0
   status: in development
+  product_type: EVENT
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: false
+    regulatory_framework: GDPR
   description: 'Datový produkt obsahuje detailní události z procesu digitálního onboardingu
 
     klientů v mobilní aplikaci nebo internetovém bankovnictví.
@@ -123,6 +128,10 @@ quality:
   field: event_id
 - rule: not_null
   field: event_timestamp
+- rule: row_count
+  min: 100
+  max: 10000000
+  description: Detects data distribution anomalies in digital onboarding events
 sla:
   availability: 99.9%
   data_latency: real_time

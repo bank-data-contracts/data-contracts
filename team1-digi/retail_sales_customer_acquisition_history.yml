@@ -6,6 +6,11 @@ info:
   maturity_score: 60%
   version: 1.0.0
   status: in development
+  product_type: EVENT
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: false
+    regulatory_framework: GDPR
   description: 'Datový produkt obsahuje historické události získání nových retailových
     klientů
 
@@ -93,6 +98,10 @@ quality:
 - rule: not_null
   field: acquisition_timestamp
   description: Čas události nesmí být prázdný
+- rule: row_count
+  min: 100
+  max: 5000000
+  description: Detects data distribution anomalies in daily customer acquisition events
 sla:
   availability: 99.5%
   data_latency: near_real_time

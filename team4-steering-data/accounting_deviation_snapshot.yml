@@ -6,6 +6,11 @@ info:
   maturity_score: 60%
   version: 1.0.0
   status: in development
+  product_type: AGGREGATION
+  x-regulatory:
+    gdpr_relevant: false
+    critical_data_element: true
+    regulatory_framework: "BCBS 239"
   description: "Data produkt slouží k vyřešení deviací mezi zůstatky hlavní knihy\
     \ (GL) a klientskými daty. \nZajišťuje bezchybný reporting mateřské společnosti,\
     \ včasnou detekci chyb a důvěryhodnost finančních výkazů.\nKonzumenti: Head Office\
@@ -124,6 +129,10 @@ quality:
   field: deviation_amount
   description: Hodnota odchylky nesmí být prázdná (může být i 0.00, pokud k odchylce
     nedošlo)
+- rule: row_count
+  min: 1
+  max: 100000
+  description: Detects data distribution anomalies in daily accounting deviation snapshot
 sla:
   availability: 99.5%
   data_latency: T+1

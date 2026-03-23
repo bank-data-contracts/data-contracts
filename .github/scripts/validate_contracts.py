@@ -92,9 +92,15 @@ def validate_contract(path):
             check(errors, "critical_data_element" in xreg,
                   "`info.x-regulatory` chybí `critical_data_element`")
             rf = xreg.get("regulatory_framework", "")
-            check(errors, rf in VALID_REGULATORY_FRAMEWORKS,
-                  f"`info.x-regulatory.regulatory_framework` musí být jeden z "
-                  f"{VALID_REGULATORY_FRAMEWORKS} (aktuálně: '{rf}')")
+            if isinstance(rf, list):
+                for item in rf:
+                    check(errors, item in VALID_REGULATORY_FRAMEWORKS,
+                          f"`info.x-regulatory.regulatory_framework` musí být jeden z "
+                          f"{VALID_REGULATORY_FRAMEWORKS} (aktuálně: '{item}')")
+            else:
+                check(errors, rf in VALID_REGULATORY_FRAMEWORKS,
+                      f"`info.x-regulatory.regulatory_framework` musí být jeden z "
+                      f"{VALID_REGULATORY_FRAMEWORKS} (aktuálně: '{rf}')")
     else:
         errors.append("  ❌ Sekce `info` musí být objekt")
 
@@ -112,6 +118,9 @@ def validate_contract(path):
     # ── Schema ───────────────────────────────────────────────
     schema = contract.get("schema", [])
     all_fields = set()
+    # Normalize: support both list format and single-table dict format
+    if isinstance(schema, dict):
+        schema = [schema]
     if isinstance(schema, list) and len(schema) > 0:
         for table in schema:
             if not isinstance(table, dict):
