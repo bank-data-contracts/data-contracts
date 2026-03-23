@@ -1,0 +1,370 @@
+dataContractSpecification: 1.1.0
+
+id: urn:businessdomain:nova-banka:accounting:customer-account-balance-state
+
+# ============================================================
+# INFO
+# ============================================================
+info:
+  title: DP_ACCOUNTING_CUSTOMER_ACCOUNT_BALANCE_STATE
+  name: Accounting Customer Account Balance State
+  product_type: STATE
+  maturity_score: 60%
+  version: 0.1.0
+  status: in development
+
+  description: |
+    Daily end-of-day snapshot of all customer financial product balances
+    standardised across core banking systems. Each row represents one
+    financial product held by one customer as of the given business date.
+    Eliminates the need for downstream teams to query source transactional
+    systems directly.
+
+    Data latency: T+1 (EOD batch available by 06:00 CET)
+
+    Business Entity:  Customer Financial Product
+    Business Purpose: Provide a unified, reconciliation-ready view of
+      customer account and loan balances for risk scoring, CRM targeting,
+      and financial controlling.
+    Consumers: Steering Data, Risk, CRM, BI & Controlling teams
+    Data Sources: Core Banking System (CBS), Loan Management System (LMS)
+
+    Filter Rules:
+    * Only records with a valid business_date (not in the future)
+    * Includes only active financial products from core systems
+    * Excludes internal/technical accounts (product_category = 'INTERNAL')
+
+    Use Cases:
+    * UC1 - Data reconciliation baseline (comparison with GL Deviation Snapshot)
+    * UC2 - Customer risk scoring and credit limit management (Risk team)
+    * UC3 - CRM campaign targeting based on balance segments (Marketing)
+    * UC4 - Head Office financial controlling and BCBS 239 reporting
+
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: true
+    regulatory_framework: "BCBS 239"
+
+  owner: Nova Banka / Team 4 / Steering Data
+  contact:
+    name: Josef Kuník
+    email: josef.kunik@nova-banka.cz
+
+# ============================================================
+# SERVERS
+# ============================================================
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: datamesh-nova-banka-prod
+    schema: accounting-prod
+    table: dp_accounting_customer_account_balance_state
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: datamesh-nova-banka-dev
+    schema: accounting-dev
+    table: dp_accounting_customer_account_balance_state
+
+# ============================================================
+# SCHEMA
+# ============================================================
+schema:
+  - name: dp_accounting_customer_account_balance_state
+    description: >
+      Daily EOD snapshot of customer financial product balances
+      across all core banking systems, standardised per BCBS 239.
+    fields:
+
+      - name: record_id
+        type: string
+        description: Unique record identifier (UUID v4)
+        required: true
+        unique: true
+        example: "987e6543-e21b-34d3-b456-426614174111"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: business_date
+        type: date
+        description: Business processing date — EOD snapshot date (YYYY-MM-DD)
+        required: true
+        example: "2024-01-31"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: region
+        type: string
+        description: Geographic region — allowed values CZ or SK
+        required: true
+        enum: [CZ, SK]
+        example: "CZ"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: customer_id
+        type: string
+        description: >
+          Unique customer identifier from the core banking system.
+          Personal data — links directly to a natural person.
+        required: true
+        example: "CUST-889911"
+        x-compliance:
+          is_pii: true
+          sensitivity: Confidential
+          legal_basis: Contractual
+
+      - name: financial_product_id
+        type: string
+        description: Unique identifier of the financial product or account
+        required: true
+        example: "ACC-55443322"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: product_category
+        type: string
+        description: >
+          High-level category of the financial product.
+          Allowed values: CURRENT_ACCOUNT, SAVINGS_ACCOUNT, LOAN, MORTGAGE,
+          CREDIT_CARD, TERM_DEPOSIT.
+        required: true
+        example: "CURRENT_ACCOUNT"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: balance_czk
+        type: decimal
+        description: >
+          End-of-day balance of the financial product in CZK.
+          Negative values indicate overdraft or outstanding loan principal.
+          Must not be null for active products.
+        required: true
+        example: 154200.75
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: currency_original
+        type: string
+        description: Original currency of the product — ISO 4217 code
+        required: true
+        example: "CZK"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: balance_original_currency
+        type: decimal
+        description: >
+          Balance in the product's original currency before FX conversion.
+          Equal to balance_czk for CZK-denominated products.
+        required: true
+        example: 154200.75
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: source_system
+        type: string
+        description: >
+          Source core banking system that originated the record.
+          Allowed values: CBS, LMS, CARD_SYSTEM.
+        required: true
+        example: "CBS"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: created_at
+        type: timestamp
+        description: Record creation timestamp in UTC
+        required: true
+        example: "2024-02-01T06:00:00Z"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: updated_at
+        type: timestamp
+        description: Record last update timestamp in UTC
+        required: true
+        example: "2024-02-01T06:00:00Z"
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+# ============================================================
+# DATA QUALITY
+# ============================================================
+quality:
+  - rule: not_null
+    field: record_id
+    description: Record ID must not be empty
+
+  - rule: unique
+    field: record_id
+    description: Every record must have a unique ID
+
+  - rule: not_null
+    field: business_date
+    description: Business date must not be empty
+
+  - rule: accepted_values
+    field: region
+    values: [CZ, SK]
+    description: Region must be CZ or SK
+
+  - rule: not_null
+    field: customer_id
+    description: Customer ID must not be empty
+
+  - rule: not_null
+    field: balance_czk
+    description: Balance must not be null for active products
+
+  - rule: not_null
+    field: financial_product_id
+    description: Financial product ID must not be empty
+
+  - rule: accepted_values
+    field: product_category
+    values: [CURRENT_ACCOUNT, SAVINGS_ACCOUNT, LOAN, MORTGAGE, CREDIT_CARD, TERM_DEPOSIT]
+    description: Product category must be one of the defined values
+
+  - rule: accepted_values
+    field: source_system
+    values: [CBS, LMS, CARD_SYSTEM]
+    description: Source system must be one of the registered systems
+
+  - rule: row_count
+    min: 50000
+    max: 5000000
+    description: >
+      Detects data distribution anomalies (volume drop/spike) in daily
+      customer account balance snapshots. A drop below 50 000 rows indicates
+      a potential ETL failure; a spike above 5 000 000 indicates data duplication.
+
+# ============================================================
+# SLA
+# ============================================================
+sla:
+  availability: 99.5%
+  data_latency: T+1
+  retention_period: 36 months
+  support_contact: josef.kunik@nova-banka.cz
+
+# ============================================================
+# TERMS OF USE
+# ============================================================
+terms:
+  usage: |
+    Authorised for use in risk scoring, CRM campaign targeting,
+    financial reconciliation, and Head Office reporting.
+    Intended for: Steering Data, Risk, CRM, BI & Controlling teams.
+  limitations: |
+    Contains personal data (customer_id). Access is restricted to
+    authorised roles only. Data must not be used outside approved
+    use cases without Data Product Owner consent.
+    Direct access to source systems (CBS, LMS) is prohibited for
+    downstream consumers — this product is the authoritative source.
+  noticePeriod: "P3M"
+
+# ============================================================
+# SERVICE LEVELS
+# ============================================================
+servicelevels:
+  freshness:
+    description: "Daily EOD batch — data available by 06:00 CET the following business day."
+  availability:
+    description: "99.5% uptime commitment covering Steering Data, Risk, CRM, and BI teams."
+  latency:
+    description: "T+1: Source EOD close to product availability is under 6 hours."
+
+# ============================================================
+# DAWISO INTEGRATION
+# ============================================================
+x-dawiso:
+  data_product:
+    dawiso_status: in_development
+    domain: Accounting
+    business_owner: Head of Accounting & Finance
+    product_owner: Josef Kuník - josef.kunik@nova-banka.cz
+    data_steward: Josef Kuník - josef.kunik@nova-banka.cz
+    tags:
+      - accounting
+      - customer-balances
+      - state
+      - bcbs-239
+      - reconciliation
+    classification: "Source-aligned Data Product"
+    data_classification: Confidential
+    lineage:
+      upstream:
+        - name: Core Banking System (CBS)
+          type: internal-system
+          description: "Primary source of current account, savings account, and term deposit balances"
+        - name: Loan Management System (LMS)
+          type: internal-system
+          description: "Source of loan and mortgage outstanding principal balances"
+        - name: Card System
+          type: internal-system
+          description: "Source of credit card balances and revolving credit utilisation"
+      downstream:
+        - name: Accounting GL Deviation Snapshot
+          type: data-product
+          description: "Consumes aggregated customer balances for reconciliation against GL account balances"
+        - name: Risk Scoring Pipeline
+          type: ml-model
+          description: "Uses balance data for customer credit limit and risk score computation"
+        - name: CRM Campaign Engine
+          type: data-product
+          description: "Segments customers by balance tier for targeted marketing campaigns"
+        - name: Head Office Reporting Engine
+          type: report
+          description: "Aggregates balances for BCBS 239 regulatory reporting to parent company"
+    rules_ko:
+      - "record_id must be a valid UUID v4"
+      - "customer_id must not be null or empty"
+      - "balance_czk must not be null for any active product"
+      - "financial_product_id must not be null or empty"
+      - "Volume must be within expected range (50 000 – 5 000 000 records per EOD snapshot)"
+      - "product_category must be one of: CURRENT_ACCOUNT, SAVINGS_ACCOUNT, LOAN, MORTGAGE, CREDIT_CARD, TERM_DEPOSIT"
+    retention:
+      period: "36 months"
+      rationale: >
+        Aligned with BCBS 239 data lineage requirements, credit file
+        retention obligations, and Nova Banka internal data governance policy.
+
+  glossary_entry:
+    term: "Accounting Customer Account Balance"
+    definition: >
+      A daily end-of-day snapshot of the outstanding balance held by
+      a customer in a specific financial product, standardised across
+      all core banking systems and expressed in CZK for cross-product
+      comparability and regulatory reporting.
+    fibo_class: "fibo-fbc-pas-caa:AccountBalance"
+    fibo_uri: "https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/AccountBalance"
+    domain: Accounting
+    dawiso_status: draft
+    steward: Josef Kuník - josef.kunik@nova-banka.cz
+    synonyms:
+      - Zůstatek klientského účtu
+      - Customer Balance
+      - Account Balance EOD
+    acronyms:
+      - CAB
+    related_capability: "Financial Reporting & Reconciliation, Credit Risk Management"
+    related_terms:
+      - "Accounting GL Deviation Snapshot"
+      - "Customer Financial Product"
+      - "GL Account Balance"
+      - "BCBS 239 Reporting"
