@@ -1,0 +1,17 @@
+name: Databricks Git Sync
+on:
+  push:
+    branches:
+      - main  # Spustí se pokaždé, když mergneš změny do hlavní větve
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Databricks Pull
+        run: |
+          curl -X PATCH \
+          -H "Authorization: Bearer ${{ secrets.DATABRICKS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"branch": "main"}' \
+          https://dbc-c89a4435-597d.cloud.databricks.com/api/2.0/repos/654922057342787
