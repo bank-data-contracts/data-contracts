@@ -2,7 +2,7 @@ name: Databricks Git Sync
 on:
   push:
     branches:
-      - main  # Spustí se pokaždé, když mergneš změny do hlavní větve
+      - main
 
 jobs:
   sync:
@@ -15,3 +15,11 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{"branch": "main"}' \
           https://dbc-c89a4435-597d.cloud.databricks.com/api/2.0/repos/654922057342787
+
+      - name: Trigger Databricks Notebook Run
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.DATABRICKS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"job_id": 655530784566119}' \
+          https://dbc-c89a4435-597d.cloud.databricks.com/api/2.1/jobs/run-now
