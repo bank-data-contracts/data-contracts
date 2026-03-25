@@ -7,8 +7,8 @@ info:
   status: in development
   product_type: STATE
   x-regulatory:
-    gdpr_relevant: false
-    critical_data_element: false
+    gdpr_relevant: true
+    critical_data_element: true
     regulatory_framework: None
   description: 'Metadata o datových produktech banky.
 
@@ -19,7 +19,7 @@ info:
     * UC2 - Knowledge Graph
 
     '
-  owner: Nova Banka \ Team2 \ Data Governance
+  owner: Tomáš Kočí
   contact:
     name: Data Governance Team
     email: data.governance@nova-banka.cz
