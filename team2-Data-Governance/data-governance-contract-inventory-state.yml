@@ -5,7 +5,7 @@ info:
   name: Data Governance Contract Inventory State
   product_type: STATE
   maturity_score: 30%
-  version: 0.1.0
+  version: 0.1.1
   status: draft
   description: |
     Centralized metadata inventory of all active Data Contracts across the Nova Banka
