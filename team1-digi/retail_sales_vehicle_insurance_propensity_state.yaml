@@ -1,0 +1,624 @@
+dataContractSpecification: 1.1.0
+id: urn:horizon-ai-bank:datamesh:retail-sales:vehicle-insurance-propensity:state:v1
+
+info:
+  title: Retail Sales Vehicle Insurance Propensity State
+  name: retail_sales_vehicle_insurance_propensity_state
+  product_type: STATE
+  maturity_score: 30%
+  version: 0.1.0
+  status: draft
+  description: |
+    Data latency: Daily (D+1); selected behavioral signals near real-time
+    Business Entity: Customer / Vehicle Insurance Propensity Profile
+    Business Purpose: Customer-level snapshot profile combining behavioral transaction
+      features and a propensity score indicating the likelihood of purchasing vehicle
+      insurance. Each row represents one client as of a given snapshot_date.
+      Supports cross-sell targeting, CRM campaign activation, and ML model scoring
+      pipelines within the Retail Sales domain.
+    Consumers: Marketing, CRM systems, ML models
+    Data Sources: Core banking system (transactions, products), CRM, campaign systems
+
+  x-regulatory:
+    gdpr_relevant: true
+    critical_data_element: true
+    regulatory_framework: "GDPR"
+    # NEW v3.3 — Extended GDPR fields
+    data_minimization: "true — only fields directly required for vehicle insurance
+      propensity scoring and campaign targeting are collected; no free-text,
+      address, or full name fields are present"
+    right_to_erasure: "true — client_id is pseudonymised; physical deletion or
+      key-rotation of the pseudonymisation mapping achieves erasure across all
+      historized snapshots without structural table changes"
+    purpose_limitation: "true — processing is strictly limited to vehicle insurance
+      cross-sell scoring, CRM campaign activation, and ML model audit/explainability;
+      re-use for unrelated purposes requires a new legal basis assessment"
+
+owner: Horizon AI Bank
+contact:
+  name: Xuan Vi Phamová
+  email: phax00@vse.cz
+
+servers:
+  PRODUCTION:
+    type: databricks
+    host: nova-banka-prod.cloud.databricks.com
+    environment: production
+    catalog: datamesh-nova-banka-prod
+    schema: retail_sales
+    table: retail_sales_vehicle_insurance_propensity_state
+  DEVELOPMENT:
+    type: databricks
+    host: nova-banka-dev.cloud.databricks.com
+    environment: development
+    catalog: datamesh-nova-banka-dev
+    schema: retail_sales
+    table: retail_sales_vehicle_insurance_propensity_state
+
+schema:
+  name: retail_sales_vehicle_insurance_propensity_state
+  description: >
+    Daily historized customer-level state table containing behavioral transaction
+    features and a vehicle insurance propensity score. One row per client per
+    snapshot_date. Supports cross-sell campaign activation, ML model serving, and
+    regulatory audit and explainability obligations (GDPR Art. 22).
+
+  fields:
+    - name: record_id
+      type: string
+      description: Unique record identifier (UUID v4)
+      required: true
+      unique: true
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "Internal governance — surrogate key for audit traceability"
+
+    - name: business_date
+      type: date
+      description: Business processing date (YYYY-MM-DD)
+      required: true
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "BCBS 239 — timeliness of risk data reporting"
+
+    - name: region
+      type: string
+      description: >
+        Geographic region of the customer's primary account or residence [CZ, SK].
+        Treated as personal data under GDPR when linked to an identified individual
+        via client_id.
+      required: true
+      enum: [CZ, SK]
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — processing necessary for performance
+          of contract; geographic partitioning for campaign targeting scope"
+
+    - name: client_id
+      type: string
+      description: >
+        Pseudonymised internal customer identifier linking the propensity record
+        to the customer master in the core banking system. Acts as the primary
+        business key. Constitutes personal data under GDPR when combined with
+        other fields in this product.
+      required: true
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — processing necessary for performance
+          of contract; GDPR Art. 25 — pseudonymisation as privacy-by-design measure"
+
+    - name: snapshot_date
+      type: date
+      description: >
+        Date for which the customer feature snapshot and propensity score were
+        computed (YYYY-MM-DD). Together with client_id forms the composite
+        natural key of the table. Enforces one-row-per-client-per-day constraint.
+      required: true
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "BCBS 239 — data accuracy and timeliness; Internal governance
+          — composite key integrity for historized state snapshots"
+
+    - name: propensity_score
+      type: decimal
+      description: >
+        Model-generated probability (0.0–1.0) indicating the customer's likelihood
+        to purchase vehicle insurance within the next 30 days. Produced by the
+        ML scoring pipeline.
+      required: true
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "GDPR Art. 22 — explainability obligation for automated
+          decision-making; EU AI Act Art. 13 — transparency of high-risk AI output"
+
+    - name: segment
+      type: string
+      description: >
+        Customer segment label assigned based on propensity score banding or CRM
+        segmentation logic (e.g., HIGH, MEDIUM, LOW). Used for campaign targeting
+        tier selection.
+      required: true
+      enum: [HIGH, MEDIUM, LOW]
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "GDPR Art. 22 — automated profiling output requiring
+          explainability; Internal governance — campaign activation tiering"
+
+    - name: fuel_spend_30d
+      type: decimal
+      description: >
+        Total CZK spend on fuel-related merchant category codes (MCC) in the 30 days
+        preceding snapshot_date. Behavioral vehicle ownership signal. Linked to an
+        identified individual — treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — processing of transaction behavioral
+          data necessary for cross-sell service; PSD2 — transaction data usage
+          under explicit consent framework"
+
+    - name: fuel_txn_count_30d
+      type: integer
+      description: >
+        Number of fuel-related transactions in the 30 days preceding snapshot_date.
+        Frequency behavioral signal complementing fuel_spend_30d.
+        Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — transaction frequency as behavioral
+          feature for contractual cross-sell processing"
+
+    - name: fuel_spend_90d
+      type: decimal
+      description: >
+        Total CZK spend on fuel-related MCCs in the 90 days preceding snapshot_date.
+        Longer-horizon behavioral signal for vehicle usage pattern detection.
+        Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — extended observation window for
+          behavioral feature engineering under contractual basis"
+
+    - name: service_txn_count_90d
+      type: integer
+      description: >
+        Number of automotive service transactions (e.g., car service, tyre shops)
+        in the 90 days preceding snapshot_date. Indicates vehicle ownership and
+        maintenance behavior. Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — automotive service transaction data
+          as behavioral ownership signal under contractual processing basis"
+
+    - name: highway_vignette_flag
+      type: boolean
+      description: >
+        Flag indicating whether the customer purchased a highway vignette in the
+        observation window, inferred from transaction data. Strong vehicle ownership
+        signal. Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — transaction-derived behavioral flag
+          under contractual cross-sell processing basis"
+
+    - name: insurance_payment_flag
+      type: boolean
+      description: >
+        Flag indicating whether the customer has an active insurance payment
+        detected in transaction data. Used as a feature and exclusion criterion
+        in campaign targeting. Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — existing insurance detection for
+          campaign exclusion logic under contractual basis"
+
+    - name: days_since_last_insurance
+      type: integer
+      description: >
+        Number of days elapsed since the last detected insurance-related payment
+        as of snapshot_date. Null if no insurance payment is detected in history.
+        Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — temporal insurance recency signal
+          for propensity model feature engineering under contractual basis"
+
+    - name: avg_txn_amount
+      type: decimal
+      description: >
+        Average transaction amount in CZK over the 90-day observation window.
+        Used as a proxy for customer financial activity level. Treated as personal
+        data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — financial activity proxy feature
+          under contractual cross-sell processing basis"
+
+    - name: total_txn_count_90d
+      type: integer
+      description: >
+        Total number of debit/credit transactions executed by the customer in
+        the 90 days preceding snapshot_date. General activity behavioral signal.
+        Treated as personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — general transaction activity signal
+          under contractual processing basis"
+
+    - name: age_band
+      type: string
+      description: >
+        Age bracket of the customer (e.g., 18-25, 26-35, 36-50, 51-65, 65+).
+        Derived from date of birth held in the core banking system. Constitutes
+        personal data under GDPR.
+      required: false
+      x-compliance:
+        is_pii: true
+        sensitivity: Confidential
+        legal_basis: Contractual
+        regulatory_basis: "GDPR Art. 6(1)(b) — demographic segmentation feature
+          under contractual basis; GDPR Art. 22 — age as explainability variable
+          in automated profiling"
+
+    - name: dq_flag
+      type: string
+      description: >
+        Data quality flag propagated from upstream feature engineering pipeline.
+        Indicates whether the customer record passed (PASS) or failed (FAIL)
+        upstream data quality checks. Used to exclude low-confidence records
+        from campaign activation.
+      required: false
+      enum: [PASS, FAIL, UNKNOWN]
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "BCBS 239 — data quality monitoring and fitness-for-purpose
+          attestation; Internal governance — upstream DQ gate propagation"
+
+quality:
+  - rule: not_null
+    field: record_id
+
+  - rule: unique
+    field: record_id
+
+  - rule: not_null
+    field: client_id
+
+  - rule: not_null
+    field: snapshot_date
+
+  - rule: not_null
+    field: propensity_score
+
+  - rule: not_null
+    field: segment
+
+  - rule: not_null
+    field: business_date
+
+  - rule: accepted_values
+    field: region
+    values: [CZ, SK]
+
+  - rule: accepted_values
+    field: segment
+    values: [HIGH, MEDIUM, LOW]
+
+  - rule: accepted_values
+    field: dq_flag
+    values: [PASS, FAIL, UNKNOWN]
+
+  - rule: row_count
+    min: 10000
+    max: 2000000
+    description: >
+      Detects data distribution anomalies (volume drop/spike). Each daily snapshot
+      is expected to contain between 10,000 and 2,000,000 customer rows reflecting
+      the active retail banking customer base across CZ and SK. Values outside this
+      range trigger a distribution anomaly alert.
+
+  - rule: custom
+    name: composite_key_uniqueness
+    description: >
+      The combination of client_id and snapshot_date must be unique per daily load,
+      enforcing one row per customer per snapshot.
+    fields: [client_id, snapshot_date]
+
+  - rule: custom
+    name: propensity_score_range_check
+    description: >
+      propensity_score must be a decimal in the range [0.0, 1.0] inclusive.
+      Values outside this range indicate a scoring pipeline error.
+    field: propensity_score
+
+  - rule: custom
+    name: scoring_distribution_stability
+    description: >
+      The share of HIGH segment customers must remain between 5% and 40% of total
+      scored population per snapshot_date. Significant deviation indicates model
+      drift or feature pipeline failure.
+    field: segment
+
+  - rule: min_value
+    field: propensity_score
+    min: 0.0
+    description: "Propensity score lower bound is 0.0."
+
+  - rule: max_value
+    field: propensity_score
+    max: 1.0
+    description: "Propensity score upper bound is 1.0."
+
+  - rule: min_value
+    field: fuel_txn_count_30d
+    min: 0
+    description: "Transaction counts must be non-negative."
+
+  - rule: min_value
+    field: total_txn_count_90d
+    min: 0
+    description: "Transaction counts must be non-negative."
+
+  - rule: min_value
+    field: days_since_last_insurance
+    min: 0
+    description: "Days since last insurance must be non-negative."
+
+  - rule: completeness
+    field: client_id
+    threshold: 100%
+    description: >
+      Full customer coverage required per snapshot_date. No missing client records
+      permitted.
+
+sla:
+  availability: 99.5%
+  data_latency: "Daily D+1; selected behavioral signals near real-time"
+  retention_period: "60 months"
+
+x-dawiso:
+  data_product:
+    dawiso_status: design
+    domain: Retail Sales
+    business_owner: "Xuan Vi Phamová - phax00@vse.cz"
+    product_owner: "Xuan Vi Phamová - phax00@vse.cz"
+    data_steward: "Xuan Vi Phamová - phax00@vse.cz"
+    tags:
+      - vehicle-insurance
+      - cross-sell
+      - propensity-score
+      - ml-feature-store
+      - retail-sales
+      - customer-profile
+      - state
+      - pojisteni-vozidel
+    classification: "Retail Sales Data Product"
+    data_classification: Confidential
+    lineage:
+      upstream:
+        - name: Core Banking System
+          type: internal-system
+          description: >
+            Source of customer transaction history, product holdings, and demographic
+            data used to compute behavioral features.
+        - name: CRM System
+          type: internal-system
+          description: >
+            Source of customer segmentation and campaign history used for feature
+            enrichment and exclusion logic.
+        - name: Campaign Systems
+          type: internal-system
+          description: >
+            Source of historical campaign response data used in model training and
+            feature engineering.
+      downstream:
+        - name: CRM Campaign Activation Layer
+          type: data-product
+          description: >
+            Consumes propensity_score and segment to activate targeted vehicle
+            insurance cross-sell campaigns.
+        - name: ML Model Monitoring Product
+          type: data-product
+          description: >
+            Consumes propensity_score distribution and dq_flag for model drift
+            detection and scoring pipeline health monitoring.
+        - name: Marketing Analytics Dashboard
+          type: data-product
+          description: >
+            Consumes segment and propensity_score for campaign planning and
+            cross-sell performance reporting.
+    rules_ko:
+      - "record_id must be a valid UUID v4"
+      - "Volume must be within expected range (10,000–2,000,000 rows per snapshot)"
+      - "client_id + snapshot_date must be unique — one row per client a snapshot_date"
+      - "propensity_score must be in range [0.0, 1.0]"
+      - "segment distribution must remain stable (HIGH segment: 5%–40% of population)"
+      - "All PII fields must be processed under documented Contractual legal basis (GDPR)"
+      - "Feature computation logic must be reproducible — reprodukovatelnost scoringu"
+      - "Full client coverage required per snapshot — kompletní pokrytí klientů"
+    retention:
+      period: "60 months"
+      rationale: >
+        Retention of 5 years (60 months) supports historized snapshot storage for
+        ML model audit trails, GDPR data subject access and erasure requests,
+        explainability obligations under automated decision-making rules (GDPR Art. 22),
+        and cross-sell performance back-testing.
+
+    # NEW v3.3 — Regulatory Mapping
+    regulatory_mapping:
+      - regulation: BCBS 239
+        status: Contributes
+        reason: >
+          business_date, snapshot_date, and dq_flag directly support data accuracy,
+          timeliness, and fitness-for-purpose requirements for risk data aggregation
+          reporting. Upstream DQ gate propagation (dq_flag) provides BCBS 239-aligned
+          data quality attestation.
+      - regulation: BASEL IV
+        status: N/A
+        reason: >
+          Product contains no risk-weighted asset (RWA), capital ratio, or credit
+          exposure inputs. Vehicle insurance propensity scoring is a commercial
+          marketing function with no prudential capital calculation role.
+      - regulation: EBA
+        status: Contributes
+        reason: >
+          Product supports EBA data governance guidelines through documented ownership,
+          data stewardship, lineage, and quality rules. Data classification and
+          sensitivity tagging align with EBA ICT and data management expectations.
+      - regulation: DORA
+        status: Contributes
+        reason: >
+          SLA availability (99.5%), defined data latency, and documented upstream
+          lineage contribute to ICT operational resilience requirements under DORA.
+          Business continuity and recovery point objectives are traceable via SLA.
+      - regulation: AML
+        status: N/A
+        reason: >
+          Product contains no transaction monitoring thresholds, KYC identity
+          verification fields, suspicious activity flags, or PEP/sanction screening
+          data. Vehicle insurance cross-sell propensity is outside AML scope.
+      - regulation: MiFID II
+        status: N/A
+        reason: >
+          Product contains no capital markets, investment product, order execution,
+          or transaction reporting data. No MiFID II best execution or suitability
+          assessment fields are present.
+      - regulation: PSD2
+        status: Restricts
+        reason: >
+          Behavioral transaction features (fuel_spend_30d, fuel_spend_90d, avg_txn_amount,
+          total_txn_count_90d etc.) are derived from payment account transaction data.
+          PSD2 restricts use of such data to explicitly consented or contractually
+          justified purposes, limiting secondary use of these fields beyond the
+          declared cross-sell purpose.
+      - regulation: GDPR
+        status: Both
+        reason: >
+          Contributes — product implements GDPR Art. 25 privacy-by-design via
+          pseudonymisation of client_id, data minimization, and purpose limitation
+          documentation. Restricts — 12 of 18 fields are classified as PII under
+          GDPR, requiring Contractual legal basis, right-to-erasure support, and
+          Art. 22 explainability obligations for automated profiling outputs.
+      - regulation: AI Act
+        status: Both
+        reason: >
+          Contributes — propensity_score and behavioral features serve as ML model
+          input and output, requiring transparency and explainability documentation
+          per EU AI Act Art. 13. Restricts — high-risk classification under AI Act
+          Annex III (AI systems used for creditworthiness/insurance assessment) imposes
+          FRIA, bias monitoring, and human oversight requirements on consumers of
+          this product.
+      - regulation: IFRS 9
+        status: N/A
+        reason: >
+          Product contains no expected credit loss (ECL) staging, probability of
+          default (PD), loss given default (LGD), or financial instrument classification
+          data. Vehicle insurance propensity is a commercial sales function.
+
+    # NEW v3.3 — AI Act / FRIA Assessment
+    ai_act:
+      is_ai_input: true
+      is_ai_output: true
+      high_risk_classification: true
+      fria_required: true
+      fria_notes: >
+        FRIA IS REQUIRED. This product is both an input to and an output of a
+        machine-learning propensity scoring system.
+
+        Affected persons: All retail banking customers in CZ and SK regions who are
+        scored without their explicit awareness of the automated profiling process.
+
+        Rights at risk:
+        (1) GDPR Art. 22 — right not to be subject to solely automated decisions
+        with significant effects. The propensity_score and segment directly determine
+        whether a customer receives a targeted insurance offer, constituting an
+        automated decision with commercial effect.
+        (2) Right to explanation — customers must be able to obtain a meaningful
+        explanation of why they were targeted or excluded, requiring feature
+        importance logging and model card documentation.
+        (3) Non-discrimination — age_band, region, and behavioral spend features
+        carry inherent bias risk if correlated with protected characteristics
+        (e.g., ethnicity-correlated spending patterns, age-based targeting).
+
+        High-risk classification basis: EU AI Act Annex III, Category 5(b) —
+        AI systems used to evaluate creditworthiness or establish credit scores,
+        and Category 5(c) — AI systems used in insurance risk assessment and pricing.
+        Vehicle insurance propensity scoring falls within scope as it affects
+        access to and pricing of financial/insurance products.
+
+        Required bias mitigation measures:
+        - Fairness audit per age_band and region segment before model deployment
+        - Monitoring of propensity_score distribution across demographic groups
+        - Human review gate for HIGH segment customers before campaign activation
+        - Model card documenting training data sources, feature importance,
+          and known limitations
+        - Opt-out mechanism allowing customers to request exclusion from
+          automated scoring (GDPR Art. 21 — right to object to profiling)
+
+  glossary_entry:
+    term: "Vehicle Insurance Propensity Score"
+    definition: >
+      A machine-learning-derived probability estimate, expressed as a decimal in the
+      range [0.0, 1.0], indicating the likelihood that a specific retail banking
+      customer will purchase a vehicle insurance product within a defined forward-looking
+      window (typically 30 days). The score is computed from behavioral transaction
+      features — including fuel spend, automotive service activity, highway vignette
+      purchases, and general transaction patterns — captured in daily customer snapshot
+      profiles. It is used by marketing and CRM functions to prioritise cross-sell
+      outreach and optimise campaign targeting efficiency within the Retail Sales domain.
+    fibo_class: "fibo-fnd-arr-asmt:Score"
+    fibo_uri: "https://spec.edmcouncil.org/fibo/ontology/FND/Arrangements/Assessments/"
+    domain: Retail Sales
+    dawiso_status: draft
+    steward: "Xuan Vi Phamová - phax00@vse.cz"
+    synonyms:
+      - Insurance Propensity Score
+      - Vehicle Insurance Likelihood Score
+      - Cross-sell Propensity Score
+      - Pravděpodobnost nákupu pojištění vozidla
+    acronyms:
+      - VIP Score
+    related_capability: "Retail Cross-sell Management"
+    related_terms:
+      - "Customer Segmentation (segmentace)"
+      - "Behavioural Feature Engineering"
+      - "ML Model Scoring Pipeline (reprodukovatelnost scoringu)"
+      - "Cross-sell Campaign Activation"
+      - "Automated Decision-Making"
+      - "Vehicle Insurance (pojištění vozidel)"
