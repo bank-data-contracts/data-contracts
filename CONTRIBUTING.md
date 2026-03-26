@@ -343,7 +343,7 @@ info:
     critical_data_element: true
     regulatory_framework: "BCBS 239"
 
-  owner: Horizon Banka \ Team6 \ Strategy
+  owner: Horizon AI Bank \ Team6 \ Strategy
   contact:
     name: Jan Novák
     email: jan.novak@nova-banka.cz
@@ -527,4 +527,4 @@ Kontaktuj správce repozitáře nebo otevři **Issue** v repozitáři:
 
 ---
 
-*Dokument vytvořen pro školní projekt Horizon Banka — Data Mesh repozitář.*
+*Dokument vytvořen pro školní projekt Horizon AI Bank — Data Mesh repozitář.*
