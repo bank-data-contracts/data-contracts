@@ -1,62 +1,81 @@
 dataContractSpecification: 1.1.0
-id: urn:businessdomain:nova-banka:strategy:market-rate-snapshot
+
+id: urn:nova-banka:strategy:market-rate:snapshot:v0.1.0
+
 info:
-  title: DP_STRATEGY_MARKET_RATE_SNAPSHOT
+  title: Strategy Market Rate Snapshot
   name: Strategy Market Rate Snapshot
-  version: 1.0.0
-  status: in development
   product_type: STATE
+  maturity_score: 30%
+  version: 0.1.0
+  status: draft
   description: |
-    Datový produkt obsahující přehled tržních úrokových sazeb a konkurenčních nabídek.
-    Slouží k monitoringu trhu a podpoře rozhodování při změnách cenotvorby banky.
-
-    Use Cases:
-    * UC1 - Monitoring oficiálních sazeb ČNB a jejich porovnání s nabídkami konkurence
-    * UC2 - Podpora boardu při reakci na náhlé změny úrokových sazeb na trhu
-
-  owner: Nova Banka \ Strategy \ Tým 6
-  contact:
-    name: Valeria Lukomskaja
-    email: xlukv00@vse.cz
+    Data latency: D+1
+    Business Entity: Market Interest Rate Record
+    Business Purpose: Overview of market interest rates and competitive offers from monitored financial institutions. Supports market monitoring and decision-making when the bank adjusts its pricing strategy.
+    Consumers: Strategy team and board of Nova Banka (internal, Team 6) for UC1 — monitoring CNB official rates vs. competitor offers; UC2 — supporting board response to sudden market rate changes.
+    Data Sources: Czech National Bank (CNB) official rate publications, Czech Statistical Office (CSU), and publicly available rate offers from monitored competitor banks (Česká spořitelna, ČSOB, KB, Raiffeisenbank, mBank, AirBank, Fio, Moneta).
 
   x-regulatory:
     gdpr_relevant: false
     critical_data_element: false
-    regulatory_framework: "None"
-    
+    regulatory_framework: "BCBS 239"
+
+  owner: "Nova Banka \\ Strategy"
+  contact:
+    name: Valeria Lukomskaja
+    email: xlukv00@vse.cz
+
 servers:
   PRODUCTION:
     type: databricks
     host: nova-banka-prod.cloud.databricks.com
     environment: production
-    catalog: vse_banka
-    schema: strategie
-    table: dp_strategy_market_rate_snapshot
+    catalog: datamesh-nova-banka-prod
+    schema: strategy
+    table: strategy_market_rate_snapshot
   DEVELOPMENT:
     type: databricks
     host: nova-banka-dev.cloud.databricks.com
     environment: development
-    catalog: vse_banka
-    schema: strategie
-    table: dp_strategy_market_rate_snapshot
-    
-schema:
-  - name: dp_strategy_market_rate_snapshot
-    description: Přehled tržních sazeb ČNB a konkurenčních nabídek k danému datu
-    fields:
+    catalog: datamesh-nova-banka-dev
+    schema: strategy
+    table: strategy_market_rate_snapshot
 
+schema:
+  - name: strategy_market_rate_snapshot
+    description: "Snapshot of CNB official rates and competitor bank offers as of a given date, used for market monitoring and pricing strategy support."
+
+    fields:
       - name: record_id
         type: string
-        description: Unikátní identifikátor záznamu (UUID)
+        description: Unique record identifier (UUID v4)
         required: true
         unique: true
         x-compliance:
           is_pii: false
           sensitivity: Internal
 
+      - name: business_date
+        type: date
+        description: Business processing date (YYYY-MM-DD)
+        required: true
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
+      - name: region
+        type: string
+        description: Geographic region [CZ, SK]
+        required: true
+        enum: [CZ, SK]
+        x-compliance:
+          is_pii: false
+          sensitivity: Internal
+
       - name: snapshot_date
         type: date
-        description: Datum snímku tržních sazeb (YYYY-MM-DD)
+        description: "Date of the market rate snapshot (YYYY-MM-DD); indicates the reference date for all rates in the record"
         required: true
         x-compliance:
           is_pii: false
@@ -64,7 +83,7 @@ schema:
 
       - name: source
         type: string
-        description: Zdroj sazby — ČNB, ČSÚ nebo název konkurenční banky
+        description: "Rate source — CNB or CSU (official) or name of a monitored competitor bank (e.g. Česká spořitelna, ČSOB, KB)"
         required: true
         x-compliance:
           is_pii: false
@@ -72,7 +91,7 @@ schema:
 
       - name: product_type
         type: string
-        description: Typ produktu (spořicí účet, hypotéka, spotřebitelský úvěr atp.)
+        description: "Financial product type for which the rate applies (e.g. savings account, mortgage, consumer loan)"
         required: true
         x-compliance:
           is_pii: false
@@ -80,7 +99,7 @@ schema:
 
       - name: rate_value
         type: decimal
-        description: Hodnota úrokové sazby v procentech p.a.
+        description: "Interest rate value in percent per annum (% p.a.); must be within realistic range -5 to 50"
         required: true
         x-compliance:
           is_pii: false
@@ -88,7 +107,7 @@ schema:
 
       - name: is_official
         type: boolean
-        description: True pokud jde o oficální sazbu ČNB, False pokud jde o konkurenční nabídku
+        description: "True if the rate is an official CNB rate; False if it is a competitor market offer"
         required: true
         x-compliance:
           is_pii: false
@@ -96,7 +115,7 @@ schema:
 
       - name: created_at
         type: timestamp
-        description: Čas vytvoření záznamu
+        description: "Timestamp of record creation; not sensitive"
         required: true
         x-compliance:
           is_pii: false
@@ -105,42 +124,106 @@ schema:
 quality:
   - rule: not_null
     field: record_id
-    description: ID záznamu nesmí být prázdné
 
   - rule: unique
     field: record_id
-    description: Každý záznam musí mít unikátní ID
 
   - rule: not_null
     field: snapshot_date
-    description: Datum snímku nesmí být prázdné
+    description: "Snapshot date must not be null"
 
   - rule: not_null
     field: rate_value
-    description: Hodnota sazby nesmí být prázdná
+    description: "Rate value must not be null"
+
+  - rule: not_null
+    field: source
+    description: "Rate source must not be null"
 
   - rule: range
     field: rate_value
     min: -5
     max: 50
-    description: Úroková sazba musí být v realistickém intervalu -5 až 50 % p.a.
+    description: "Interest rate must be within a realistic range of -5 to 50 % p.a."
 
   - rule: accepted_values
     field: source
     values: [ČNB, ČSÚ, Česká spořitelna, ČSOB, KB, Raiffeisenbank, mBank, AirBank, Fio, Moneta]
-    description: Zdroj musí být ze seznamu sledovaných institucí
+    description: "Source must be from the list of monitored institutions"
 
-  - rule: not_null
-    field: source
-    description: Zdroj sazby nesmí být prázdný
+  - rule: accepted_values
+    field: region
+    values: [CZ, SK]
 
   - rule: row_count
-    min: 1
+    min: 10
     max: 100000
-    description: "Detects data distribution anomalies (volume drop/spike)"
+    description: "Detects data distribution anomalies (volume drop/spike). Lower bound raised to 10 to ensure at least one full snapshot cycle is present."
 
 sla:
   availability: 99.5%
-  data_latency: D+1
-  retention_period: 36 months
-  support_contact: strategy@nova-banka.cz
+  data_latency: "D+1"
+  retention_period: "36 months"
+
+x-dawiso:
+  data_product:
+    dawiso_status: design
+    domain: Strategy
+    business_owner: "Valeria Lukomskaja - xlukv00@vse.cz"
+    product_owner: "Valeria Lukomskaja - xlukv00@vse.cz"
+    data_steward: "Valeria Lukomskaja - xlukv00@vse.cz"
+    tags:
+      - strategy
+      - market-rates
+      - cnb
+      - competitor-monitoring
+      - pricing
+    classification: "Strategy Data Product"
+    data_classification: Internal
+    lineage:
+      upstream:
+        - name: "Czech National Bank (CNB) — official rate publications"
+          type: internal-system
+          description: "Official CNB interest rate decisions and key rate announcements."
+        - name: "Czech Statistical Office (CSU)"
+          type: internal-system
+          description: "Macroeconomic indicators and statistical rate data."
+        - name: "Competitor bank public rate offers"
+          type: internal-system
+          description: "Publicly available rate offers from: Česká spořitelna, ČSOB, KB, Raiffeisenbank, mBank, AirBank, Fio, Moneta."
+      downstream:
+        - name: "Strategy team pricing decision support"
+          type: data-product
+          description: "Used by Strategy team and board for market monitoring and pricing strategy adjustments."
+    rules_ko:
+      - "record_id must be a valid UUID v4"
+      - "rate_value must be within range -5 to 50 % p.a."
+      - "source must be from the approved list of monitored institutions"
+      - "snapshot_date and rate_value must not be null"
+      - "Volume must be within expected range (10–100000 rows)"
+    retention:
+      period: "36 months"
+      rationale: "Rate history over 3 years enables trend analysis and supports regulatory reporting requirements under BCBS 239."
+
+glossary_entry:
+  term: "Market Interest Rate Record"
+  definition: "A point-in-time record of an interest rate — either an official Czech National Bank rate or a competitor bank's publicly available product rate — captured for the purpose of market monitoring and pricing strategy support at Nova Banka. Each record is associated with a specific financial product type, source institution, and reference date."
+  fibo_class: "fibo-fbc-fi-ip:InterestRate"
+  fibo_uri: "https://spec.edmcouncil.org/fibo/ontology/FBC/FinancialInstruments/InstrumentPricing/InterestRate"
+  domain: Strategy
+  dawiso_status: draft
+  steward: "Valeria Lukomskaja - xlukv00@vse.cz"
+  synonyms:
+    - Market Rate
+    - Benchmark Rate
+    - Competitor Rate
+  acronyms:
+    - CNB
+    - CSU
+  related_capability: "Market Monitoring / Pricing Strategy"
+  related_terms:
+    - "CNB Key Rate"
+    - "Competitor Offer"
+    - "Pricing Decision"
+    - "Interest Rate Benchmark"
+  kg_triple: "StrategyMarketRateSnapshot --contains--> MarketInterestRateRecord --sourcedFrom--> CNBOrCompetitorInstitution"
