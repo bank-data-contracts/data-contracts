@@ -1,5 +1,5 @@
 dataContractSpecification: 1.1.0
-id: urn:businessdomain:nova-banka:strategy:strategy-kpi-aggregation
+id: urn:businessdomain:nova-banka:strategy:market-rate-snapshot
 info:
   title: DP_STRATEGY_MARKET_RATE_SNAPSHOT
   name: Strategy Market Rate Snapshot
@@ -16,8 +16,8 @@ info:
 
   owner: Nova Banka \ Strategy \ Tým 6
   contact:
-    name: Strategy Team
-    email: strategy@nova-banka.cz
+    name: Valeria Lukomskaja
+    email: xlukv00@vse.cz
 
   x-regulatory:
     gdpr_relevant: false
@@ -127,7 +127,7 @@ quality:
 
   - rule: accepted_values
     field: source
-    values: [ČNB, ČSÚ, Česká spořitelna, ČSOB, Komerční banka, Raiffeisenbank, mBank, Air Bank]
+    values: [ČNB, ČSÚ, Česká spořitelna, ČSOB, KB, Raiffeisenbank, mBank, AirBank, Fio, Moneta]
     description: Zdroj musí být ze seznamu sledovaných institucí
 
   - rule: not_null
