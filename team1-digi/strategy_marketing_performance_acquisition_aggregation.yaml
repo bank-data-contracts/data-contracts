@@ -1,5 +1,5 @@
 dataContractSpecification: 1.1.0
-id: urn:nova-banka:datamesh:strategy:marketing-performance-acquisition:aggregation:v1
+id: urn:horizon-ai-bank:datamesh:strategy:marketing-performance-acquisition:aggregation:v1
 
 info:
   title: Strategy Marketing Performance Acquisition Aggregation
@@ -24,11 +24,21 @@ info:
     gdpr_relevant: false
     critical_data_element: true
     regulatory_framework: "None"
+    # NEW v3.3 — Extended GDPR fields
+    data_minimization: "true — no personal data is collected; all fields are
+      aggregated campaign-level KPIs; client_id is used only as a deduplication
+      key during the COUNT(DISTINCT) transform and is intentionally excluded
+      from this product's output"
+    right_to_erasure: "false — product contains no personal data; GDPR right
+      to erasure is not applicable to anonymised aggregated marketing metrics"
+    purpose_limitation: "true — processing is strictly limited to marketing
+      campaign performance measurement, finance reconciliation, and management
+      reporting; no personal profiling or individual-level analytics are performed"
 
-  owner: Nova Banka
-  contact:
-    name: Xuan Vi Phamová
-    email: phax00@vse.cz
+owner: Horizon AI Bank
+contact:
+  name: Xuan Vi Phamová
+  email: phax00@vse.cz
 
 servers:
   PRODUCTION:
@@ -53,6 +63,8 @@ schema:
     combination of campaign date, campaign name, and advertising platform.
     Contains KPI metrics — acquired clients, total spend, and cost per acquisition —
     used for cross-layer campaign performance reporting and finance reconciliation.
+    The clients field is derived as COUNT(DISTINCT client_id) from the upstream
+    gold_fact_acquisitions table; client_id itself is not present in this product.
 
   fields:
     - name: record_id
@@ -63,6 +75,7 @@ schema:
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — surrogate key for audit traceability"
 
     - name: business_date
       type: date
@@ -71,67 +84,97 @@ schema:
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "BCBS 239 — timeliness of risk data reporting"
 
     - name: region
       type: string
-      description: Geographic region [CZ, SK]
+      description: >
+        Geographic region [CZ, SK].
+        WARNING — SIMULATED FIELD: As of v0.1.0 this field is hardcoded as 'CZ'
+        in the upstream gold_fact_acquisitions table. Real region signal must be
+        sourced from the branch or service system before this field can be used
+        for geographic segmentation in reporting.
       required: true
       enum: [CZ, SK]
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — geographic partitioning for
+          campaign reporting scope; NOTE: value is simulated pending real source"
 
     - name: date
       type: date
       description: >
         Campaign activity date (YYYY-MM-DD) for which the KPI metrics are aggregated.
+        Derived from DATE(activated_at) in gold_fact_acquisitions.
         Together with campaign and platform forms the composite natural key of the table.
       required: true
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — temporal dimension of campaign
+          performance aggregation; BCBS 239 — data timeliness traceability"
 
     - name: campaign
       type: string
       description: >
         Name or identifier of the marketing campaign as defined in the source
-        advertising platform or CRM system.
+        advertising platform or CRM system. Mapped from the UTM campaign parameter
+        in gold_fact_acquisitions, sourced from silver_web_sessions.
       required: true
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — campaign dimension for KPI
+          attribution and cross-layer aggregation consistency"
 
     - name: platform
       type: string
       description: >
         Advertising or tracking platform from which campaign data originates.
         Expected values include: Google Ads, Meta Ads, Affiliate, Web tracking, CRM.
+        FIELD MAPPING: maps to the 'source' column (UTM source parameter) in
+        gold_fact_acquisitions containing values such as 'google', 'meta',
+        'affiliate'. Renamed to 'platform' during the aggregation transform
+        for reporting clarity.
       required: true
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — platform dimension for spend
+          reconciliation; maps to 'source' (UTM) in gold_fact_acquisitions"
 
     - name: clients
       type: integer
       description: >
-        Number of new customers (clients) acquired through the campaign on the
-        given date. Must be a non-negative integer. Used as the denominator in
-        CPA calculation.
+        Number of distinct customers acquired through the campaign on the given date.
+        Computed as COUNT(DISTINCT client_id) from gold_fact_acquisitions grouped
+        by acquisition_date, campaign, and source (platform). COUNT(DISTINCT) is
+        mandatory to prevent double-counting of customers with multiple web sessions
+        or account records. Used as the denominator in the CPA calculation.
       required: true
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — acquisition count KPI derived via
+          COUNT(DISTINCT client_id); finance audit traceability for customer
+          onboarding reconciliation against core banking"
 
     - name: total_cost_czk
       type: decimal
       description: >
         Total marketing spend for the campaign and platform on the given date,
         expressed in Czech Koruna (CZK). Must be non-negative. Used as the
-        numerator in CPA calculation.
+        numerator in CPA calculation. Sourced from advertising platform cost
+        exports (Google Ads, Meta Ads, Affiliate); not present in
+        gold_fact_acquisitions — joined to acquisition counts during the
+        aggregation transform.
       required: true
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — financial spend KPI for budget
+          reconciliation and management reporting"
 
     - name: cpa_czk
       type: decimal
@@ -139,10 +182,32 @@ schema:
         Cost per acquisition in CZK, calculated as total_cost_czk / clients.
         Must be null when clients = 0 to prevent division-by-zero errors.
         Must reconcile with the formula across all aggregation layers.
+        Because clients is derived via COUNT(DISTINCT client_id), CPA correctly
+        reflects spend per unique acquired customer and not per session or
+        account record.
       required: false
       x-compliance:
         is_pii: false
         sensitivity: Internal
+        regulatory_basis: "Internal governance — derived efficiency KPI; formula
+          consistency required across all downstream reporting layers"
+
+    - name: dq_flag
+      type: string
+      description: >
+        Data quality flag to be propagated from the upstream gold_fact_acquisitions
+        pipeline. WARNING — NOT YET OPERATIONAL: dq_flag is currently commented
+        out in the upstream gold table definition. Included as a placeholder;
+        must be populated before automated quality monitoring is operational.
+        Expected values: PASS, FAIL, UNKNOWN.
+      required: false
+      enum: [PASS, FAIL, UNKNOWN]
+      x-compliance:
+        is_pii: false
+        sensitivity: Internal
+        regulatory_basis: "BCBS 239 — data quality monitoring and fitness-for-purpose
+          attestation; Internal governance — upstream DQ gate propagation
+          (PENDING: not yet implemented in gold_fact_acquisitions)"
 
 quality:
   - rule: not_null
@@ -173,13 +238,17 @@ quality:
     field: region
     values: [CZ, SK]
 
+  - rule: accepted_values
+    field: dq_flag
+    values: [PASS, FAIL, UNKNOWN]
+
   - rule: row_count
     min: 50
     max: 5000
     description: >
       Detects data distribution anomalies (volume drop/spike). Each daily load
       is expected to contain between 50 and 5,000 rows reflecting active
-      campaign × platform × date combinations across CZ and SK. Values outside
+      campaign x platform x date combinations across CZ and SK. Values outside
       this range trigger a distribution anomaly alert requiring investigation.
 
   - rule: custom
@@ -194,8 +263,35 @@ quality:
     description: >
       cpa_czk must equal total_cost_czk / clients within a tolerance of 0.01 CZK.
       Records where clients = 0 must have cpa_czk as null. Validates consistent
-      CPA aggregation across all reporting layers.
+      CPA aggregation across all reporting layers. clients must be computed as
+      COUNT(DISTINCT client_id) — plain COUNT(*) is not acceptable.
     field: cpa_czk
+
+  - rule: custom
+    name: distinct_client_count_validation
+    description: >
+      clients must equal COUNT(DISTINCT client_id) from gold_fact_acquisitions
+      for the same date + campaign + source (platform) grouping. Any discrepancy
+      indicates the aggregation transform used COUNT(*) instead of COUNT(DISTINCT
+      client_id), causing double-counting of multi-session customers.
+    field: clients
+
+  - rule: custom
+    name: region_simulation_flag
+    description: >
+      WARNING: region is currently hardcoded as 'CZ' in gold_fact_acquisitions.
+      This rule monitors whether all rows contain only 'CZ' — if true, it confirms
+      the simulation is still active and real region data has not yet been sourced.
+      Must be resolved before geographic segmentation is used in reporting.
+    field: region
+
+  - rule: custom
+    name: dq_flag_population_check
+    description: >
+      dq_flag is currently commented out upstream and will be null for all rows.
+      Monitors null rate of dq_flag — 100% null rate confirms the upstream gap
+      is still open and must be escalated to the data engineering team.
+    field: dq_flag
 
   - rule: min_value
     field: clients
@@ -269,7 +365,7 @@ x-dawiso:
           type: data-product
           description: >
             Consumes aggregated KPIs for executive marketing performance
-            and campaign ROI reporting.
+            and campaign ROI reporting (Power BI).
         - name: Finance Cost Reconciliation Product
           type: data-product
           description: >
@@ -284,11 +380,15 @@ x-dawiso:
       - "record_id must be a valid UUID v4"
       - "Volume must be within expected range (50–5,000 rows per business date)"
       - "date + campaign + platform must be unique (one row per combination)"
+      - "clients must be computed as COUNT(DISTINCT client_id) — COUNT(*) is not acceptable"
       - "cpa_czk must equal total_cost_czk / clients within 0.01 CZK tolerance"
       - "cpa_czk must be null when clients = 0"
       - "clients and total_cost_czk must be non-negative"
       - "All active campaigns must be present per business date — no gaps in coverage"
-      - "CPA aggregation must be consistent across all reporting layers"
+      - "CPA aggregation must be consistent across all downstream reporting layers"
+      - "OPEN GAP: region is hardcoded 'CZ' simulation — must be replaced with real source before geographic reporting is used"
+      - "OPEN GAP: device_type is hardcoded 'mobile' simulation in gold_fact_acquisitions"
+      - "OPEN GAP: dq_flag is commented out in gold_fact_acquisitions — must be implemented before automated quality monitoring is operational"
     retention:
       period: "60 months"
       rationale: >
@@ -296,15 +396,99 @@ x-dawiso:
         of marketing performance, campaign benchmarking, finance audit requirements,
         and management reporting lookback periods.
 
+    # NEW v3.3 — Regulatory Mapping
+    regulatory_mapping:
+      - regulation: BCBS 239
+        status: Contributes
+        reason: >
+          business_date and date fields support data timeliness traceability.
+          Quality rules (row_count, completeness, composite_key_uniqueness,
+          distinct_client_count_validation) contribute to data accuracy and
+          aggregation integrity requirements under BCBS 239 for management
+          information reporting.
+      - regulation: BASEL IV
+        status: N/A
+        reason: >
+          Product contains no risk-weighted asset (RWA), capital ratio, credit
+          exposure, or prudential capital calculation inputs. Marketing campaign
+          KPIs are a commercial function with no Basel IV scope.
+      - regulation: EBA
+        status: Contributes
+        reason: >
+          Product supports EBA data governance guidelines through documented
+          ownership, data stewardship, lineage (including gold and silver-layer
+          sources), quality rules, and data classification.
+      - regulation: DORA
+        status: Contributes
+        reason: >
+          SLA availability (99.5%), defined data latency (D+1 by 07:00 CET),
+          and documented upstream gold/silver lineage contribute to ICT operational
+          resilience and data availability recovery requirements under DORA.
+      - regulation: AML
+        status: N/A
+        reason: >
+          Product contains no transaction monitoring thresholds, KYC identity
+          fields, suspicious activity flags, or customer identity data. Aggregated
+          campaign-level marketing KPIs are entirely outside AML scope.
+      - regulation: MiFID II
+        status: N/A
+        reason: >
+          Product contains no capital markets, investment product suitability,
+          order execution, or transaction reporting data. Marketing acquisition
+          KPIs have no MiFID II applicability.
+      - regulation: PSD2
+        status: N/A
+        reason: >
+          Product contains no payment account transaction data, open banking
+          APIs, or payment service provider information. All fields are
+          aggregated campaign-level metrics with no PSD2 scope.
+      - regulation: GDPR
+        status: N/A
+        reason: >
+          Product contains no personal data in its output. client_id is used
+          only as a deduplication key during the COUNT(DISTINCT) aggregation
+          transform and is intentionally excluded from this product.
+          gdpr_relevant is false. No GDPR obligations apply to the output layer.
+      - regulation: AI Act
+        status: N/A
+        reason: >
+          Product is not an input to or output of an AI or ML system. CPA and
+          acquisition counts are deterministic formula-based aggregations from
+          gold_fact_acquisitions. No automated decision-making or profiling
+          is performed.
+      - regulation: IFRS 9
+        status: N/A
+        reason: >
+          Product contains no expected credit loss (ECL) staging, probability
+          of default, financial instrument classification, or impairment data.
+          Marketing spend and acquisition counts have no IFRS 9 scope.
+
+    # NEW v3.3 — AI Act / FRIA Assessment
+    ai_act:
+      is_ai_input: false
+      is_ai_output: false
+      high_risk_classification: false
+      fria_required: false
+      fria_notes: >
+        FRIA IS NOT REQUIRED. This product is a deterministic aggregation of
+        campaign-level marketing KPIs (spend, client counts, CPA) produced by
+        COUNT(DISTINCT client_id) grouping and formula-based CPA computation
+        from gold_fact_acquisitions and advertising platform cost exports.
+        It is not used as input to any AI or ML model and is not produced by
+        any AI or ML model. No automated decision-making affecting individuals
+        is performed. No personal data is present in the output. EU AI Act
+        high-risk classification criteria under Annex III are not met.
+
 glossary_entry:
   term: "Cost Per Acquisition (CPA)"
   definition: >
     An aggregated financial performance indicator representing the total marketing
     expenditure required to acquire one new banking client through a specific
     campaign and advertising platform on a given business date. Calculated as
-    total campaign spend in Czech Koruna (CZK) divided by the number of newly
-    acquired clients. Serves as the primary efficiency KPI for evaluating marketing
-    campaign performance across channels and platforms within the Strategy domain.
+    total campaign spend in Czech Koruna (CZK) divided by the count of distinct
+    acquired clients (COUNT(DISTINCT client_id) from gold_fact_acquisitions).
+    Serves as the primary efficiency KPI for evaluating marketing campaign
+    performance across channels and platforms within the Strategy domain.
   fibo_class: "fibo-fnd-gao-obj:StrategicObjective"
   fibo_uri: "https://spec.edmcouncil.org/fibo/ontology/FND/GoalsAndObjectives/Objectives/"
   domain: Strategy
@@ -320,8 +504,6 @@ glossary_entry:
   related_capability: "Marketing Performance Management"
   related_terms:
     - "Marketing Campaign"
-    - "Total Campaign Cost (total_cost_czk)"
+    - "Costs of Customer Acquisition Campaigns (total_cost_czk)"
     - "Acquired Clients (clients)"
-    - "Return on Marketing Investment (ROMI)"
-    - "Customer Lifetime Value (CLV)"
     - "Conversion Rate"
