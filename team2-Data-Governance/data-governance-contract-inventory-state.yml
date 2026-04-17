@@ -4,7 +4,7 @@ info:
   title: Data Governance Contract Inventory State
   name: Data Governance Contract Inventory State
   product_type: STATE
-  maturity_score: 30%
+  maturity_score: 50%
   version: 0.1.0
   status: draft
   description: |
